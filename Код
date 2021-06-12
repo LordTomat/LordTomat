@@ -1,0 +1,2903 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.IO;
+
+namespace ТрадицииНашегоПлемени
+{
+    public partial class Form1 : Form
+    {
+        WMPLib.WindowsMediaPlayer Player;
+        int rFood; //Еда
+        int rPeople; //Кол. людей в поселении
+        int rHeal; //Лекарства в поселении
+        int rWeapon; //Кол. оружия в поселении
+        int rWood; //Кол. примитивных ресурсов 
+        int rMetal; //Кол металлического хлама
+        int rGold; //Кол. драгоценностей
+        int rMorale; //Психологическое состояние поселения
+        int Day = -1; //Сколько дней прошло в игре
+        int RepTribe; //Репутация с ближайшим племенем
+        int RepCity; //Репутация с ближайшим индустриальным городом
+        int RepCastle; //Репутация с ближайшим замком
+        bool Show = true; //Тестовая переключался для показания/убирание кнопок и ивентовых штук
+        string TextSave; //Используется для сохранения
+        int EventN = 0; //Айдишник ивента. Нулевой - старт
+        Random rnd = new Random();
+        byte[] EventCheck = new byte[200]; //Массив - айди уникального ивента, проверяет, активирова ли он...
+        bool EventU = false; //Если true - то сейчас идёт уникальный ивент, не отнимает дни, не отнимает еду...
+        int N; int U; int Y; int T; int B; int R; int P; //Типо локальные переменные, но во время реализации case оно не хочет их "делить" с другими, поэтому делаю их в таком виде
+        //Чтоб не забыть. rnd.Next(1, 4) = случайное от 1 до 3, т.е. последнее -1 по какой то причине. (потому что счёт начинается с 0, балда!)
+        bool[] HaveAch = new bool[20]; //Запоминает, получил ли игрок то или иное достижение
+        bool[] HaveStat = new bool[20]; //Запоминает, есть ли у игрока тот или иной статусный эффект
+        string[] StatText = {"Запасы еды", "Хорошая подготовка", "Неизвестная болезнь", "Домашний скот", "Замороженный конфликт", "Каменные стены" };
+        string[] AchText = { "1 год", "Манса Муса", "Первобытный коммунизм", "Горшочек, не вари!", "Последователи Штирнера" };
+        string[] AchDesc = { "Ваше племя смогло выжить в течении года, поразительная живучесть, учитывая что происходит каждый день.", "Вы добыли безумно больше количество драгоценностей для этих мест, можете не экономить до конца жизни!", "Кажется, у вас получилось создать ту самую идею сплочённости, однако, у вас совсем туго с едой... Издержки режима", "У вас скопилось так много еды, что в племени тема фатшейминга поднимается чаще всего остального.", "Вы никому ничего не обязаны и делайте то, что считайте нужным и по силам. Отношения с другими фракциями - дело вторичное." };
+        List<Control> list_labels = new List<Control>();
+        List<Control> list_labels2 = new List<Control>();
+        byte DevLVL = 0; //Уровень развития поселения. 0 - племя, 1 - замок, 2 - город, 3 -космос. Последние 2 вряд ли будут доступны игроку, но на всякий...
+        byte EnemyDevLVL = 0; //Используется для битв
+        int EnemyNum; //Используется для битв как подсчёт кол. врагов
+        int PlaceBattle; //Айди места битвы
+        byte TimeBattle; //Айди времени битвы
+        bool BattleGo = false; //Проверяет, идёт ли битва. Сделал, дабы ненароком нельзя было тыкать на кнопки за полем битвы
+        int IDT; //Айдишник атаки. Запоминает, какую тактику прожал игрок и реагирует на неё
+        int IDD; //Айдишник события. Запоминает, что происходит вообще на поле боя
+        string[] BattleLogs = { "Вражеские войска идут в лобовую атаку на открытом пространстве...",}; //Текст для события
+        public Form1()
+        {
+            InitializeComponent();
+            NumDay.Visible = false;
+            SaveGame.Visible = false;
+            StartGame.Location = new Point(350, 150);
+            LoadGame.Location = new Point(350, 205);
+            NumFood.Visible = false;
+            NumGold.Visible = false;
+            NumHeal.Visible = false;
+            NumMetal.Visible = false;
+            NumMorale.Visible = false;
+            NumPeople.Visible = false;
+            NumWeapon.Visible = false;
+            NumWoodStone.Visible = false;
+            TradeTrack.Visible = false;
+            PanelStatus.Visible = false;
+            ButtStat.Visible = false;
+            PanelBattle.Visible = false;
+            ShutDownString();
+            HideGameplay();
+            list_labels.Add(label1); list_labels.Add(label2); list_labels.Add(label3); list_labels.Add(label4); list_labels.Add(label5); list_labels.Add(label6); list_labels.Add(label7); list_labels.Add(label8); list_labels.Add(label9); list_labels.Add(label10); list_labels.Add(label11); list_labels.Add(label12); list_labels.Add(label13); list_labels.Add(label14); list_labels.Add(label15); list_labels.Add(label16); list_labels.Add(label17); list_labels.Add(label18); list_labels.Add(label19); list_labels.Add(label20);
+            list_labels2.Add(Status1); list_labels2.Add(Status2); list_labels2.Add(Status3); list_labels2.Add(Status4); list_labels2.Add(Status5); list_labels2.Add(Status6);
+        }
+
+        private void StartGame_Click(object sender, EventArgs e)
+        {
+            Starting();
+        }
+
+        private void LoadGame_Click(object sender, EventArgs e)
+        {
+            Starting();
+            string Text = File.ReadAllText("СейвФайлИгрушкиТрадицииНашегоПлемени.txt");
+            using (StreamReader file = new StreamReader("СейвФайлИгрушкиТрадицииНашегоПлемени.txt"))
+            {
+                int counter = 0;
+                string ln;
+
+                while ((ln = file.ReadLine()) != null)
+                {
+                    switch (Convert.ToString(counter))
+                    {
+                        case "0":
+                            Day = Int32.Parse(ln) - 1;
+                            break;
+                        case "1":
+                            rPeople = Int32.Parse(ln);
+                            break;
+                        case "2":
+                            rMorale = Int32.Parse(ln);
+                            break;
+                        case "3":
+                            rHeal = Int32.Parse(ln);
+                            break;
+                        case "4":
+                            rFood = Int32.Parse(ln);
+                            break;
+                        case "5":
+                            rGold = Int32.Parse(ln);
+                            break;
+                        case "6":
+                            rWeapon = Int32.Parse(ln);
+                            break;
+                        case "7":
+                            rWood = Int32.Parse(ln);
+                            break;
+                        case "8":
+                            rMetal = Int32.Parse(ln);
+                            break;
+                        case "9":
+                            EventN = Int32.Parse(ln);
+                            break;
+                        case "10":
+                            char[] b = new char[ln.Length];
+                            using (StringReader sr = new StringReader(ln))
+                            {
+                                sr.Read(b, 0, ln.Length);
+                                System.Console.WriteLine(b);
+                            }
+                            for (int i = 0; b.Length > i; i++)
+                            {
+                                if (b[i] == '1')
+                                {
+                                    HaveAch[i] = true;
+                                }
+                                else
+                                {
+                                    HaveAch[i] = false;
+                                }
+                            }
+                            break;
+                        case "11":
+                            RepTribe = Int32.Parse(ln);
+                            break;
+                        case "12":
+                            RepCastle = Int32.Parse(ln);
+                            break;
+                        case "13":
+                            RepCity = Int32.Parse(ln);
+                            break;
+                        case "14":
+                            DevLVL = Byte.Parse(ln);
+                            break;
+                        case "15":
+                            char[] g = new char[ln.Length];
+                            using (StringReader sr = new StringReader(ln))
+                            {
+                                sr.Read(g, 0, ln.Length);
+                                System.Console.WriteLine(g);
+                            }
+                            for (int i = 0; g.Length > i; i++)
+                            {
+                                if (g[i] == '1')
+                                {
+                                    HaveStat[i] = true;
+                                }
+                                else
+                                {
+                                    HaveStat[i] = false;
+                                }
+                            }
+                            break;
+                    }
+                    counter++;
+                }
+                file.Close();
+            }
+            TextUpdate();
+            EventLoad();
+        }
+        private void SaveGame_Click(object sender, EventArgs e)
+        {
+            string AchSave = "";
+            string StatSave = "";
+            for (int i = 0; HaveAch.Length > i; i++)
+            {
+                if (HaveAch[i] == false)
+                {
+                    AchSave += "0";
+                }
+                else
+                {
+                    AchSave += "1";
+                }
+            }
+            for (int i = 0; HaveStat.Length > i; i++)
+            {
+                if (HaveStat[i] == false)
+                {
+                    StatSave += "0";
+                }
+                else
+                {
+                    StatSave += "1";
+                }
+            }
+            System.Console.WriteLine("Готово");
+            TextSave = Day + "\n" + rPeople + "\n" + rMorale + "\n" + rHeal + "\n" + rFood + "\n" + rGold + "\n" + rWeapon + "\n" + rWood + "\n" + rMetal + "\n" + EventN + "\n" + AchSave + "\n" + RepTribe + "\n" + RepCastle + "\n" + RepCity + "\n" + DevLVL + "\n" + StatSave;
+            string destPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "СейвФайлИгрушкиТрадицииНашегоПлемени.txt");
+            File.WriteAllText(destPath, TextSave.ToString());
+            MessageBox.Show("Игра сохранена. Текстовый файл с сохранением появится в той же папке, где и exeшник игры. Не трогайте его, иначе всё поломайте нахрен... Даже не переименовывайте!");
+        }
+        public void Starting()
+        {
+            Music.Start();
+            for (int i = 0; i < HaveAch.Length; i++)
+            {
+                HaveAch[i] = false;
+            }
+            Random rnd = new Random();
+            rPeople = rnd.Next(7, 12);
+            rGold = rnd.Next(0, 2);
+            rHeal = rnd.Next(4, 11);
+            rFood = rnd.Next(12, 20);
+            rMetal = rnd.Next(0, 8);
+            rWeapon = rnd.Next(3, 8);
+            rWood = rnd.Next(7, 12);
+            rMorale = rnd.Next(70, 90);
+            RepCastle = rnd.Next(200, 501);
+            RepTribe = rnd.Next(0, 751);
+            RepCity = rnd.Next(300, 351);
+            EventPicture.BackgroundImage = Properties.Resources.Ниггеры;
+            NumFood.Visible = true;
+            NumGold.Visible = true;
+            NumHeal.Visible = true;
+            NumMetal.Visible = true;
+            NumMorale.Visible = true;
+            NumPeople.Visible = true;
+            NumWeapon.Visible = true;
+            NumWoodStone.Visible = true;
+            StartGame.Visible = false;
+            LoadGame.Visible = false;
+            SaveGame.Visible = true;
+            NumDay.Visible = true;
+            ButtStat.Visible = true;
+            HideGameplay();
+            TextUpdate();
+            EventLoad();
+        }
+
+        public void TextUpdate()
+        {
+            if (rFood < 0) { rFood = 0; }
+            if (rPeople < 0) { rPeople = 0; }
+            if (rGold < 0) { rGold = 0; }
+            if (rHeal < 0) { rHeal = 0; }
+            if (rMetal < 0) { rMetal = 0; }
+            if (rMorale < 0) { rMorale = 0; }
+            if (rWeapon < 0) { rWeapon = 0; }
+            if (rWood < 0) { rWood = 0; }
+            NumFood.Text = "Еды: " + rFood;
+            NumGold.Text = "Драгоценностей: " + rGold;
+            NumHeal.Text = "Лекарств: " + rHeal;
+            NumMetal.Text = "Стали: " + rMetal;
+            NumMorale.Text = "Мораль: " + rMorale;
+            NumPeople.Text = "Население: " + rPeople;
+            NumWeapon.Text = "Оружия: " + rWeapon;
+            NumWoodStone.Text = "Примитив. ресурсов: " + rWood;
+            NumDay.Text = "День " + Day;
+        }
+
+        public void HideGameplay()
+        {
+            Show = !Show;
+            EventButt1.Visible = Show;
+            EventButt2.Visible = Show;
+            EventButt3.Visible = Show;
+            EventButt4.Visible = Show;
+            EventButt5.Visible = Show;
+            EventButt6.Visible = Show;
+            EventPicture.Visible = Show;
+            EventText.Visible = Show;
+        }
+
+        public void CheckRes()
+        {
+            if (EventN != 0 && EventU == false)
+            {
+                if (HaveStat[3] == true) { rFood++; }
+                if (HaveStat[4] == true) { rMorale -= 3; ; }
+                if (rFood <= 0)
+                {
+                    if (HaveStat[0] == true)
+                    {
+                        HaveStat[0] = false;
+                        rFood = 10;
+                    }
+                    else
+                    {
+                        rPeople--;
+                        rMorale -= 5;
+                    }
+                }
+                if (rPeople >= 5)
+                {
+                    rFood -= (rPeople / 5);
+                }    
+                else
+                {
+                    rFood--;
+                }
+                if (rMorale <= 0)
+                {
+                    rPeople--;
+                }
+                if (rMorale > 100)
+                {
+                    rMorale = 100;
+                }
+                if (RepCastle <= 0)
+                {
+                    RepCastle = 0;
+                }
+                if (RepCity <= 0)
+                {
+                    RepCity = 0;
+                }
+                if (RepTribe <= 0)
+                {
+                    RepTribe = 0;
+                }
+                if (HaveStat[2] == true)
+                {
+                    if (rHeal >= 1)
+                    {
+                        rHeal--;
+                    }
+                    else
+                    {
+                        rPeople--;
+                    }
+                    int I = rnd.Next(1, 11);
+                    if (I == 10)
+                    {
+                        HaveStat[2] = false;
+                    }    
+                }
+                TextUpdate();
+                if (rPeople == 0)
+                {
+                    GG();
+                }
+                //if (Day == 100) //Временно удалена ввиду появления ачивки за год выживания
+                //{
+                //    Win();
+                //}    
+            }    
+        }
+
+        private void EventLoad()
+        {
+            if (EventU == false) 
+            { Day++; 
+                if (HaveAch[0] == false && Day >= 365) 
+                { 
+                    HaveAch[0] = true; 
+                } 
+                if (HaveAch[1] == false && rGold >= 100)
+                {
+                    HaveAch[1] = true;
+                }
+                if (HaveAch[2] == false && rFood <= 0 && rMorale >= 100)
+                {
+                    HaveAch[2] = true;
+                }
+                if (HaveAch[3] == false && rFood >= rPeople * 12 && rPeople >= 10)
+                {
+                    HaveAch[3] = true;
+                }
+                if (HaveAch[4] == false && RepCity <= 0 && RepTribe <= 0 && RepCastle <= 0)
+                {
+                    HaveAch[4] = true;
+                }
+            }  
+            NumDay.Text = "День " + Day;
+            EventButt1.Visible = false;
+            EventButt2.Visible = false;
+            EventButt3.Visible = false;
+            EventButt4.Visible = false;
+            EventButt5.Visible = false;
+            EventButt6.Visible = false;
+            switch (Convert.ToString(EventN))
+            {
+                case "0":
+                    EventPicture.BackgroundImage = Properties.Resources.Ниггеры;
+                    EventText.Text = "Добро пожаловать в игру ''Традиции нашего племен'', в ней вы возьмёте на себя роль старосты одного примитивного\nплемени посреди хаотичного мира, где переплетены так же эпохи средневековья, современности, космоса и ваша. \nПодобный мир вы могли видеть в такой игре, как RimWorld, и сеттинг этой игры вполне себе вдохновлён им. Ваша\nцель - выжить как можно дольше, принимая судьбоносные решения для своего племени каждый день. Ваш самый \nглавный параметр - ''Население''. Если он упадёт до нуля - вы проиграйте. ''Еда'' и ''Мораль'' так же являются важными\nпараметрами, т.к. если они упадут до нуля - начнёт падать и население, а игра может выдать неприятные ивенты.\nК тому же 5 жителей потребляют 1 ед. пищи каждый день, поэтому за ней нужно особенно следить. На доступные \nрешения влияют ваши другие параметры (кол. ресурсов, репутация, особый статус, уровень развития и т.д.). \nУдачи!";
+                    EventButt1.Visible = true;
+                    EventButt1.Text = "все я поняв дай играть ИГРАТЬ, играть!";
+                    break;
+                case "1":
+                    EventPicture.BackgroundImage = Properties.Resources.MedievalSlave;
+                    EventText.Text = "К нашему поселению пришёл беглый раб из средневекового замка. Он хочет спрятаться у вас от потенциальных \nпреследвателей. ";
+                    if (rFood >= 1)
+                    {
+                        EventButt1.Visible = true;
+                        EventButt1.Text = "Теперь он в нашем племени";
+                        EventButt3.Visible = true;
+                        EventButt3.Text = "Пусть переждёт ночь, а днём поможет в деревне";
+                    }
+                    if (rWeapon >= 1)
+                    {
+                        EventButt2.Visible = true;
+                        EventButt2.Text = "Принесём его в жертву";
+                    }    
+                    EventButt4.Visible = true;
+                    EventButt4.Text = "Просто отказать";
+                    EventButt5.Visible = true;
+                    EventButt5.Text = "Верните его обратно в замок";
+                    break;
+                case "2":
+                    EventPicture.BackgroundImage = Properties.Resources.ModernTrash;
+                    EventText.Text = "Недалеко от нас космический корабль выкинул промышленный мусор. Это легкий, но иногда опасный источник \nиндустриальных ресурсов, ибо там может быть таинственная ''радиация'' или даже ''огненная вспышка''.";
+                    EventButt1.Visible = true;
+                    EventButt1.Text = "Идите и найдите там что-то";
+                    EventButt2.Visible = true;
+                    EventButt2.Text = "Соберите мелкие обломки, не подходите близко!";
+                    EventButt3.Visible = true;
+                    EventButt3.Text = "Проигнорируйте кучу, займитесь сбором других ресурсов";
+                    break;
+                case "3":
+                    EventPicture.BackgroundImage = Properties.Resources.Herd;
+                    EventText.Text = "На полях замечена мигрирующая стая оленей. Это неплохая возможность безопасно пополнить запасы пищи.";
+                    if (rWeapon >= 1)
+                    {
+                        EventButt1.Visible = true;
+                        EventButt1.Text = "Все на охоту!";
+                        EventButt4.Visible = true;
+                        EventButt4.Text = "Мы должны поблагодарить богов за это";
+                    }
+                    if (rWeapon >= 2)
+                    {
+                        EventButt2.Visible = true;
+                        EventButt2.Text = "Не жалейте стрел, они всё равно тут не останутся";
+                    }
+                    EventButt3.Visible = true;
+                    EventButt3.Text = "Лучше займитесь собирательством";
+                    break;
+                case "4":
+                    EventPicture.BackgroundImage = Properties.Resources.Sick;
+                    EventText.Text = "Один из ваших племенных братьев заболел неизвестной заразой. Шаман говорит, что его будет тяжело вернуть, но\nшансы спасти его всё же есть. Что мы будем делать?";
+                    if (rHeal >= 6)
+                    {
+                        EventButt1.Visible = true;
+                        EventButt1.Text = "Делайте что угодно, главное спасите его!";
+                    }
+                    if (rHeal >= 2)
+                    {
+                        EventButt2.Visible = true;
+                        EventButt2.Text = "Дайте ему нашей ''универсальной'' травяной настойки";
+                    }
+                    EventButt3.Visible = true;
+                    EventButt3.Text = "Помолимся!";
+                    break;
+                case "5":
+                    EventPicture.BackgroundImage = Properties.Resources.Earthquake;
+                    EventText.Text = "В результате очередного катаклизма средней степени тяжести часть вашей деревни была разрушена. Нужно что то\nрешить с домами, некоторым буквально негде жить!";
+                    if (rWood >= 6)
+                    {
+                        EventButt1.Text = "Выделите ресурсы на ремонт";
+                        EventButt1.Visible = true;
+                    }    
+                    if (rMetal >= 6)
+                    {
+                        EventButt2.Text = "Залатайте дыры металлом";
+                        EventButt2.Visible = true;
+                    }
+                    if (rGold >= 2 && RepTribe >= 250)
+                    {
+                        EventButt3.Text = "Обменяйте наши ценности в ближайшем поселении на помощь с восстановлением";
+                        EventButt3.Visible = true;
+                    }
+                    EventButt4.Text = "Мы были прокляты! Вините бога!";
+                    EventButt4.Visible = true;
+                    if (RepCastle >= 750)
+                    {
+                        EventButt5.Text = "Попросим помощи у феодала ближайшего замка";
+                        EventButt5.Visible = true;
+                    }
+                    break;
+                case "6":
+                    EventPicture.BackgroundImage = Properties.Resources.GoodHarvest;
+                    EventText.Text = "Собиратели сегодня принесли неплохой урожай грибов и ягод. Как мы с ним поступим?";
+                    EventButt1.Text = "Несите в амбар";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Сделайте побольше лекарств";
+                    EventButt2.Visible = true;
+                    EventButt3.Text = "Устроим праздник! И про жертвы богам не забывать...";
+                    EventButt3.Visible = true;
+                    EventButt4.Text = "Разделим эту радость с соседями, пригласим их на праздник";
+                    EventButt4.Visible = true;
+                    if (HaveStat[0] == false)
+                    {
+                        EventButt5.Text = "Сделайте запасы на случай голода";
+                        EventButt5.Visible = true;
+                    }
+                    break;
+                case "7":
+                    EventPicture.BackgroundImage = Properties.Resources.Thief;
+                    EventText.Text = "Сегодня ночью один из наших соплеменников пытался проникнуть к нам на общинный склад и что то там украсть.\nВоришка был пойман, однако нам нужно решить, что с ним сделать и как его наказать...";
+                    EventButt1.Text = "Казнить, нельзя помиловать!";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Казнить нельзя, помиловать!";
+                    EventButt2.Visible = true;
+                    EventButt3.Text = "Изгнать из племени";
+                    EventButt3.Visible = true;
+                    if (RepTribe >= 250)
+                    {
+                        EventButt4.Text = "Продать в рабство соседнему поселению";
+                        EventButt4.Visible = true;
+                    }
+                    break;
+                case "8":
+                    EventPicture.BackgroundImage = Properties.Resources.MakingGold;
+                    EventText.Text = "Наш шаман утверждает, что он нашёл способ превращения металла в золото! Он просит выдать ему нужное количество\nматериала для реализации его амбиций.";
+                    if (rMetal >= 5)
+                    {
+                        EventButt1.Text = "Дайте ему то, что он просит";
+                        EventButt1.Visible = true;
+                    }
+                    EventButt2.Text = "Нет, шаман Карасик, ты уже не первый раз такое говоришь...";
+                    EventButt2.Visible = true;
+                    if (rHeal >= 1)
+                    {
+                        EventButt3.Text = "Шаман перепил огненной воды, нужно его принудительно вылечить";
+                        EventButt3.Visible = true;
+                    }
+                    if (rWood >= 5)
+                    {
+                        EventButt4.Text = "...А из дерева сможешь?";
+                        EventButt4.Visible = true;
+                    }
+                    break;
+                case "9":
+                    EventPicture.BackgroundImage = Properties.Resources.LookSky;
+                    EventText.Text = "В небе было замечено необычное явление: облака выстроились, подобной фигуре, которую называть в племени -\nтабу. Это явно символ и знак нам от богов, но какой?";
+                    EventButt1.Text = "Конец близок!";
+                    EventButt1.Visible = true;
+                    if (rFood >= 4)
+                    {
+                        EventButt2.Text = "Богам нужно принести пищу как дар!";
+                        EventButt2.Visible = true;
+                    }
+                    if (rWood >= 4)
+                    {
+                        EventButt3.Text = "Разводите костры!";
+                        EventButt3.Visible = true;
+                    }
+                    if (rGold >= 2)
+                    {
+                        EventButt4.Text = "Боги требуют наших сокровищ!";
+                        EventButt4.Visible = true;
+                    }
+                    if (rPeople >= 2)
+                    {
+                        EventButt5.Text = "Боги хотят самую красивую... Колю в жертву! (Коля не урчи)";
+                        EventButt5.Visible = true;
+                    }
+                    if (RepTribe < 250)
+                    {
+                        EventButt6.Text = "Это всё из-за племени ''Лапы капибары''. Нападём на них!";
+                        EventButt6.Visible = true;
+                    }
+                    break;
+                case "10":
+                    EventPicture.BackgroundImage = Properties.Resources.Boar;
+                    EventText.Text = "Недалеко от деревни нашли стаю кабанов. Они могут быть опасными, но нам тоже надо что то кушать. Рискнем ли \nмы поохотится на них?";
+                    if (rWeapon >= 4)
+                    {
+                        EventButt1.Text = "Возьмите наше лучшее оружие для этого";
+                        EventButt1.Visible = true;
+                    }
+                    if (rWeapon >= 2)
+                    {
+                        EventButt2.Text = "Возьмём только копья";
+                        EventButt2.Visible = true;
+                    }
+                    EventButt3.Text = "Нам не нужно оружие, что бы завалить каких то свиней с клыками";
+                    EventButt3.Visible = true;
+                    EventButt4.Text = "Пожалуй, в этот раз на охоту не пойдём";
+                    EventButt4.Visible = true;
+                    if (RepTribe >= 750)
+                    {
+                        EventButt5.Text = "Позовём на помощь в охоте соседнее племя и разделим добычу";
+                        EventButt5.Visible = true;
+                    }
+                    break;
+                case "11":
+                    EventPicture.BackgroundImage = Properties.Resources.LostInForest;
+                    EventText.Text = "Наш разведчик не вернулся сегодня. Это было рутинное задание по осмотру округи на предмет ''чего либо''. Что\nнам делать с тем фактом, что он ''потерялся''? Стоит ли тратить силы на его поиски, или он сам вернётся?";
+                    if (rWeapon >= 1 && rHeal >= 1 && rPeople >= 3)
+                    {
+                        EventButt1.Text = "Отправьте 2 людей на его поиски";
+                        EventButt1.Visible = true;
+                    }
+                    EventButt2.Text = "Помолимся за упокой его души...";
+                    EventButt2.Visible = true;
+                    EventButt3.Text = "Не унывайте! Он жив и вернётся, он просто задерживается...";
+                    EventButt3.Visible = true;
+                    break;
+                case "12":
+                    EventPicture.BackgroundImage = Properties.Resources.NewMember;
+                    EventText.Text = "Вы встретили заблудившегося солдата из индустриального мира. Он, раненный, пытался отбиться от стаи волков.\nОн благодарен вам за то, что вы спасли его от стаи и просит вас помочь ему залечить его раны...";
+                    EventButt1.Text = "Нет уж, иди гуляй, у нас лекарств нет";
+                    EventButt1.Visible = true;
+                    if (rHeal >= 2)
+                    {
+                        EventButt2.Text = "Только с условием, что он останется жить у нас и будет помогать общине";
+                        EventButt2.Visible = true;
+                        EventButt3.Text = "Только с условием, что он отдаст своё оружие";
+                        EventButt3.Visible = true;
+                        EventButt5.Text = "Просто спасти его и ничего не требовать";
+                        EventButt5.Visible = true;
+                    }
+                    EventButt4.Text = "Разоружите его и бросьте умирать. Иж че подумал, типо мы его спасли...";
+                    EventButt4.Visible = true;
+                    break;
+                case "13":
+                    EventPicture.BackgroundImage = Properties.Resources.NeedWeapon;
+                    EventText.Text = "''Если завтра война, если враг нападёт?'', именно с таким вопросом пришёл наш самый главный воин племени к вам\nв хижину, и мысль в целом, здравая. Нам не помешало бы пополнить запасы оружия...";
+                    if (rMetal >= 4)
+                    {
+                        EventButt1.Text = "Прикажите выковать нам его из железа!";
+                        EventButt1.Visible = true;
+                    }
+                    if (rWood >= 4)
+                    {
+                        EventButt2.Text = "Выточите копья, луки и стрелы из дерева";
+                        EventButt2.Visible = true;
+                    }
+                    if (rGold >= 2 && RepCity >= 250)
+                    {
+                        EventButt3.Text = "Давайте купим его в гетто соседнего города?";
+                        EventButt3.Visible = true;
+                    }
+                    if (rFood >= 2 && rHeal >= 2 && RepCastle >= 250)
+                    {
+                        EventButt4.Text = "Обменяем в ближайшем замке за еду и лекарства";
+                        EventButt4.Visible = true;
+                    }
+                    EventButt5.Text = "Нам хватает наших запасов...";
+                    EventButt5.Visible = true;
+                    break;
+                case "14":
+                    EventPicture.BackgroundImage = Properties.Resources.FindGold;
+                    EventText.Text = "На севере в горах была обнаружена пещера с золотыми вкроплениями, но когда мы выходили из пещеры - обнаружили \nзнак какой то городской бригады, которая, кажется, ''пометила'' шахту, как свою. Что мы будем с этим делать?";
+                    if (rMetal >= 1 && RepCity >= 250 && RepCity < 750)
+                    {
+                        EventButt1.Text = "Шахта всё ещё на территории нашего племени, начинайте добычу и игнорируйте городских";
+                        EventButt1.Visible = true;
+                    }
+                    if (rPeople >= 3)
+                    {
+                        EventButt2.Text = "Мы можем продать им наших оболтусов как рабочую силу на шахте";
+                        EventButt2.Visible = true;
+                    }
+                    if (RepCastle >= 250 && RepCity < 250)
+                    {
+                        EventButt3.Text = "Расскажем об этой шахте людям из замка и будем наблюдать за весельем";
+                        EventButt3.Visible = true;
+                    }
+                    EventButt4.Text = "Нам не нужны конфликты, проигнорируйте шахту";
+                    EventButt4.Visible = true;
+                    if (RepCity >= 750 && rMetal >= 1)
+                    {
+                        EventButt5.Text = "Мы имеем полное право на эту шахту. Напомните им об их ''союзных'' обязательствах!";
+                        EventButt5.Visible = true;
+                    }
+                    if (RepCity >= 750)
+                    {
+                        EventButt6.Text = "Она находится на нашей территории, пусть платят процент!";
+                        EventButt6.Visible = true;
+                    }
+                    break;
+                case "15":
+                    EventPicture.BackgroundImage = Properties.Resources.CastleWantGold;
+                    EventText.Text = "В ваше племя прибыл гонец от ближайшего замка, выстрелил стрелой с посланием в ближайший сарай и умчался. В\nписьме сказано, что т.к. этот самый сарай из племени занимает новозахваченную замком территорию - ваше племя\nтеперь часть их королевства, и вы должны заплатить дань как 2 ед. драгоценностей.";
+                    EventButt1.Text = "А если нет?";
+                    EventButt1.Visible = true;
+                    if (rGold >= 2)
+                    {
+                        EventButt2.Text = "Так и быть, только не бейте";
+                        EventButt2.Visible = true;
+                    }
+                    if (rFood >= 4)
+                    {
+                        EventButt3.Text = "А едой можно?";
+                        EventButt3.Visible = true;
+                    }
+                    if (RepCastle >= 750)
+                    {
+                        EventButt4.Text = "Непонял. Мы же в союзе, какая дань...";
+                        EventButt4.Visible = true;
+                    }
+                    if (RepCity >= 750)
+                    {
+                        EventButt5.Text = "Попросим город и местный гринпис нас защитить";
+                        EventButt5.Visible = true;
+                    }
+                    if (rGold >= 4)
+                    {
+                        EventButt6.Text = "Мы заплатим в два раза больше, дабы повысить уважение к нам";
+                        EventButt6.Visible = true;
+                    }
+                    break;
+                case "16":
+                    EventPicture.BackgroundImage = Properties.Resources.borderconflict;
+                    EventText.Text = "Кажется, соседнему племени хватило наглости ''захватить'' несколько деревьев с фруктами, которые выросли на\nнашей границе, и как следствие, они могут их собирать. Это неприемлимо! Соплеменники злы, что мы будем делать?";
+                    EventButt1.Text = "Выгонем этим мерзавцев силой";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Проигнорируем";
+                    EventButt2.Visible = true;
+                    if (RepTribe >= 250)
+                    {
+                        EventButt3.Text = "Мы не воюем с этим племенем, пойдём и уладим вопрос с их старостой, мирно";
+                        EventButt3.Visible = true;
+                    }
+                    if (rWeapon >= 2)
+                    {
+                        EventButt4.Text = "Просто обстреляйте и спугните их";
+                        EventButt4.Visible = true;
+                    }
+                    EventButt5.Text = "Они его так хотят? Ну, мы его тогда официально его подарим!";
+                    EventButt5.Visible = true;
+                    break;
+                case "17":
+                    EventPicture.BackgroundImage = Properties.Resources.WoodIsFood;
+                    EventText.Text = "Сегодня поиск пищи разведчиками оказался тщетным, и ваш шаман предложил перекусить сегодня чем нибудь из наших\nдругих запасов...";
+                    if (rMetal >= 3)
+                    {
+                        EventButt1.Text = "Могут ли соплеменники есть металл?";
+                        EventButt1.Visible = true;
+                    } 
+                    if (rWood >= 3)
+                    {
+                        EventButt2.Text = "Сегодня в рационе - мох, кора и чайный гриб";
+                        EventButt2.Visible = true;
+                    }
+                    if (HaveStat[3] == true)
+                    {
+                        EventButt3.Text = "Эй, у нас же есть домашний скот. Клушу пора кушать!";
+                        EventButt3.Visible = true;
+                    }
+                    EventButt4.Text = "Сегодня мы голодаем";
+                    EventButt4.Visible = true;
+                    if (RepCastle >= 750)
+                    {
+                        EventButt5.Text = "Попросим у замка немного хлебушка";
+                        EventButt5.Visible = true;
+                    }
+                    break;
+                case "18":
+                    EventPicture.BackgroundImage = Properties.Resources.Slave;
+                    EventText.Text = "Сегодня ваше племя наткнулось на новую ферму ближайшего замка с кучей рабов. На удивление, надзирателя не было\nвидно, и вы можете попытаться что то с ней сделать.";
+                    EventButt1.Text = "Украдите немного еды и не попадайтесь никому не глаза";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Предложите их рабам сбежать к нам, но это точно кто то заметит и расскажет";
+                    EventButt2.Visible = true;
+                    if (rWeapon >= 1)
+                    {
+                        EventButt3.Text = "Сделайте вооружённый набег, спугните крестьян и заберите урожай";
+                        EventButt3.Visible = true;
+                    }
+                    if (RepCastle >= 750)
+                    {
+                        EventButt4.Text = "Воспользуемся привелегией близости к монарху и попросим еды";
+                        EventButt4.Visible = true;
+                    }
+                    if (RepCastle >= 250 && rGold >= 2)
+                    {
+                        EventButt5.Text = "Давайте купим у них еды по оптовой цене (вы не знайте, что такое оптовая цена)";
+                        EventButt5.Visible = true;
+                    }
+                    if (RepCastle >= 250 && rPeople >= 2)
+                    {
+                        EventButt6.Text = "Хорошее место, что бы продать буйного соплеменника в рабство";
+                        EventButt6.Visible = true;
+                    }
+                    break;
+                case "19":
+                    EventPicture.BackgroundImage = Properties.Resources.TribeGoWar;
+                    EventText.Text = "Наши воины племени жаждут крови. В поселении звучат предложения устроить куда нибудь боевой рейд как в старые\nдобрые дикие времена.";
+                    EventButt1.Visible = true;
+                    EventButt1.Text = "Хорошее предложение, давайте нападём на соседнее племя!";
+                    EventButt2.Visible = true;
+                    EventButt2.Text = "В соседнем замке много интересного, давайте не мелочиться и осадим его";
+                    EventButt3.Visible = true;
+                    EventButt3.Text = "А давайте налетим на гетто того здорового города? Там очень много прикольных вещей";
+                    EventButt4.Visible = true;
+                    EventButt4.Text = "Судари, ну боже правый, что за варварство? Налёт? Отнюдь! Не надо злить соседей";
+                    if (rWeapon >= 1)
+                    {
+                        EventButt5.Text = "Лучше сходите на охоту";
+                        EventButt5.Visible = true;
+                    }
+                    if (rPeople >= 3)
+                    {
+                        EventButt6.Text = "Если вы так хотите выпустить пар - подеритесь меж собой";
+                        EventButt6.Visible = true;
+                    }    
+                    break;
+                case "20":
+                    EventPicture.BackgroundImage = Properties.Resources.CityNeedOurMen;
+                    EventText.Text = "К нам пришла странная группа людей из индустриального города и назвали какую то ''организацию''. Они хотят \nзабрать нашего соплеменника ''для обучения'', дабы вырастить его в городском окружении и что то проверить.";
+                    if (rPeople >= 2)
+                    {
+                        EventButt1.Visible = true;
+                        EventButt1.Text = "Да, они могут забрать одного";
+                        EventButt3.Visible = true;
+                        EventButt3.Text = "Пусть забирают, но не за бесплатно";
+                    }
+                    EventButt2.Visible = true;
+                    EventButt2.Text = "Нет! Нам нужны наши рабочие руки";
+                    EventButt4.Visible = true;
+                    EventButt4.Text = "А эти ''организации'' вас хорошо кормят. Вы выглядите аппетитно";
+                    EventButt5.Visible = true;
+                    EventButt5.Text = "Отберите у них вещи и выгоните пинками";
+                    break;
+                case "800":
+                    EventPicture.BackgroundImage = Properties.Resources.Starve;
+                    EventText.Text = "В поселении уже сутки нету никакой еды. Племя спонтанно собралсь в центре поселения и нужно принять решение:\nчто (и как) сегодня покушать?";
+                    EventButt1.Text = "Нужно потуже затянуть набедренные повязки...";
+                    EventButt1.Visible = true;
+                    if (rWood >= 3)
+                    {
+                        EventButt2.Text = "Может ли племя есть камни?";
+                        EventButt2.Visible = true;
+                    }
+                    if (rHeal >= rPeople)
+                    {
+                        EventButt3.Text = "У нас в запасе довольно много целебных корешков...";
+                        EventButt3.Visible = true;
+                    }
+                    if (rPeople >= 2)
+                    {
+                        EventButt4.Text = "Играем ''Камень-точило-папирус''. Проигравшего - кушаем";
+                        EventButt4.Visible = true;
+                    }
+                    break;
+                case "850":
+                    EventPicture.BackgroundImage = Properties.Resources.PreBattleTribe;
+                    EnemyNum = rnd.Next(2, 13);
+                    EventText.Text = "Из-за плохих отношений с соседним племенем те собираются на вас напасть. Что мы будем делать?\nИх отряд насчитывает " + EnemyNum + " чел.";
+                    EventButt1.Text = "Мы примем бой!";
+                    EventButt1.Visible = true;
+                    if (rWood >= 2 || rMetal >= 2 || rHeal >= 2 || rFood >= 2)
+                    {
+                        EventButt2.Text = "Мы не можем драться! Отступим и отдадим поселение на разграбление...";
+                        EventButt2.Visible = true;
+                    }
+                    if (rGold >= 6 && RepTribe != 0)
+                    {
+                        EventButt3.Text = "Откупитесь от них нашим золотом...";
+                        EventButt3.Visible = true;
+                    }
+                    break;
+                case "851":
+                    EventPicture.BackgroundImage = Properties.Resources.PreBattleMedieval;
+                    EnemyNum = rnd.Next(2, 13);
+                    EventText.Text = "Из-за плохих отношений с соседним замком те собираются на вас напасть. Что мы будем делать?\nИх отряд насчитывает " + EnemyNum + " чел.";
+                    EventButt1.Text = "Мы примем бой!";
+                    EventButt1.Visible = true;
+                    if (rWood >= 2 || rMetal >= 2 || rHeal >= 2 || rFood >= 2)
+                    {
+                        EventButt2.Text = "Мы не можем драться! Отступим и отдадим поселение на разграбление...";
+                        EventButt2.Visible = true;
+                    }
+                    if (rGold >= 6 && RepCastle != 0)
+                    {
+                        EventButt3.Text = "Откупитесь от них нашим золотом...";
+                        EventButt3.Visible = true;
+                    }
+                    break;
+                case "852":
+                    EventPicture.BackgroundImage = Properties.Resources.PreBattleCity;
+                    EnemyNum = rnd.Next(2, 13);
+                    EventText.Text = "Из-за плохих отношений с соседним городом те выслали на вас отряд намёников. Что мы будем делать?\nИх отряд насчитывает " + EnemyNum + " чел.";
+                    EventButt1.Text = "Мы примем бой!";
+                    EventButt1.Visible = true;
+                    if (rWood >= 2 || rMetal >= 2 || rHeal >= 2 || rFood >= 2)
+                    {
+                        EventButt2.Text = "Мы не можем драться! Отступим и отдадим поселение на разграбление...";
+                        EventButt2.Visible = true;
+                    }
+                    if (rGold >= 6 && RepCity != 0)
+                    {
+                        EventButt3.Text = "Откупитесь от них нашим золотом...";
+                        EventButt3.Visible = true;
+                    }
+                    break;
+                case "853":
+                    EventPicture.BackgroundImage = Properties.Resources.Military;
+                    EventText.Text = "Город почему то решил взять наше племя в свою сферу влияния и предлагает нам услугу. Он готов послать к нам\nвоенных инструкторов, дабы те обучили нас военной тактике. Однако это не жест доброй воли и они требуют \nоплату в размере 4 ед. драгоценностей.";
+                    EventButt1.Text = "По рукам";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Сфера влияния, говоришь... Это дорого. Мы согласны на 3 ед.";
+                    EventButt2.Visible = true;
+                    EventButt3.Text = "Не в этот раз...";
+                    EventButt3.Visible = true;
+                    break;
+                case "854":
+                    EventPicture.BackgroundImage = Properties.Resources.skot;
+                    EventText.Text = "Соседнее дружеское племя предложило нам купить у них несколько лишних голов скота. Наличие домашних животных \nобеспечит нас более стабильным источником пищи. За это они требуют 4 ед. драгоценностей.";
+                    EventButt1.Text = "Берём";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Зачем его покупать, если можно взять силой?";
+                    EventButt2.Visible = true;
+                    EventButt3.Text = "Не в этот раз...";
+                    EventButt3.Visible = true;
+                    if (rWood >= 8)
+                    {
+                        EventButt4.Text = "А они принимают материалами?";
+                        EventButt4.Visible = true;
+                    }
+                    break;
+                case "855":
+                    EventPicture.BackgroundImage = Properties.Resources.Coronavirus;
+                    EventText.Text = "Сегодня один человек из племени подозрительно плохо себя чувствует. Кажется, он заболел чем то серьёзным и\nзаразным. Эти симптомы для нас в новинку";
+                    EventButt1.Text = "Зовите шамана! Будем лечить его духовной силой";
+                    EventButt1.Visible = true;
+                    if (rHeal >= 6)
+                    {
+                        EventButt2.Text = "Тащите все лекарства, что у нас есть";
+                        EventButt2.Visible = true;
+                    }
+                    EventButt3.Text = "Давайте его просто изолируем от всех";
+                    EventButt3.Visible = true;
+                    if (RepCity >= 750 && rGold >= 1)
+                    {
+                        EventButt4.Text = "Зовите целителя из города, мы готовы ему платить!";
+                        EventButt4.Visible = true;
+                    }    
+                    break;
+                case "856":
+                    EventPicture.BackgroundImage = Properties.Resources.StoneWall;
+                    EventText.Text = "У нас накопилось довольно много камня и дерева и один из соплеменников предложил построить стену ''от этих''...";
+                    EventButt1.Text = "Хорошая идея";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Дурная идея";
+                    EventButt2.Visible = true;
+                    break;
+                case "900":
+                    EventPicture.BackgroundImage = Properties.Resources.Riot;
+                    EventText.Text = "В поселении моральный упадок, люди действительно разозлены вашими решениями и племя сегодня-завтра может вас\nубить посреди ночи, и за вас никто не заступится. Надо эту проблему как то решать...";
+                    if (rPeople >= rFood)
+                    {
+                        EventButt1.Text = "Сегодня всем 4 порции еды!";
+                        EventButt1.Visible = true;
+                    }
+                    if (rPeople >= 2 && rWeapon >= 2)
+                    {
+                        EventButt2.Text = "Нужна показательная казнь";
+                        EventButt2.Visible = true;
+                    }
+                    EventButt3.Text = "Все нормально, я Капитан...";
+                    EventButt3.Visible = true;
+                    if (rPeople >= rGold)
+                    {
+                        EventButt4.Text = "Давайте просто раздадим блестяшек из запасов...";
+                        EventButt4.Visible = true;
+                    }
+                    EventButt5.Text = "Я толкну вдохновляющую речь!";
+                    EventButt5.Visible = true;
+                    break;
+                case "901":
+                    EventPicture.BackgroundImage = Properties.Resources.Riot2;
+                    EventText.Text = "Толпа недовольных селян племени стоят перед вашей ''резиденцией''. Они очень недовольны происходящим и требуют\nпрямо сейчас разрешить все их проблемы и пересмотреть прошлые решения. Вы этого, естественно, сделать не можете.\nКак разобраться с толпой фанатичных соплеменников?";
+                    EventButt1.Text = "Пообещать разобраться со всем-всем (нет)";
+                    EventButt1.Visible = true;
+                    if (rWeapon >= (rPeople / 2) && rPeople >= 2)
+                    {
+                        EventButt2.Text = "Разогнать силой";
+                        EventButt2.Visible = true;
+                    }
+                    if (rHeal >= 1 || rWood >= 1 || rMetal >= 1)
+                    {
+                        EventButt3.Text = "Просто откройте склад...";
+                        EventButt3.Visible = true;
+                    }
+                    break;
+                case "902":
+                    EventPicture.BackgroundImage = Properties.Resources.GodSad;
+                    EventText.Text = "Ввиду последних событий наше племя находится в религиозном безумии. Оно не понимает, почему боги отвернулись\nот них (и послали ещё вас к ним, какой кошмар). Надо как то решить эти религиозные проблемы...";
+                    EventButt1.Text = "Нам нужно просто больше молиться!";
+                    EventButt1.Visible = true;
+                    EventButt2.Text = "Бог отвернулся от нас, потому что его НЕТ!";
+                    EventButt2.Visible = true;
+                    if (rPeople >= 2)
+                    {
+                        EventButt3.Text = "Нам нужно больше жертвоприношений...";
+                        EventButt3.Visible = true;
+                    }    
+                    if (rWood >= 10)
+                    {
+                        EventButt4.Text = "Надо разжечь ОГРОМНЫЙ костёр, что бы бог нас увидел!";
+                        EventButt4.Visible = true;
+                    }
+                    if (rHeal >= rPeople)
+                    {
+                        EventButt5.Text = "Народу нужно лекарство ''для души''";
+                        EventButt5.Visible = true;
+                    }
+                    if (rMetal >= 6 && rGold >= 6)
+                    {
+                        EventButt6.Text = "Давайте построим богу статую из блестяшек и жести?";
+                        EventButt6.Visible = true;
+                    }
+                    break;
+                case "999":
+                    EventPicture.BackgroundImage = Properties.Resources.Trade;
+                    EventButt1.Visible = true;
+                    EventButt2.Visible = true;
+                    EventButt1.Text = "Купить";
+                    EventButt2.Text = "Нам нет нужды покупать это";
+                    break;
+                case "1000":
+                    EventPicture.BackgroundImage = Properties.Resources.Klad;
+                    EventText.Text = "Сегодня вы обнаружили остатки одного исследователя индустриального мира. У него была карта округи, на которой\nкрестиком была обозначена одна территория. Неужели тут где то закопаны драгоценности?";
+                    EventButt1.Visible = true;
+                    EventButt1.Text = "Соберите общину, мы идём искать золото!";
+                    EventButt2.Visible = true;
+                    EventButt2.Text = "Лучше бы ты сухих веток принёс, это долго гореть не будет...";
+                    break;
+                case "1001":
+                    EventPicture.BackgroundImage = Properties.Resources.Klad1;
+                    EventText.Text = "Вы отправились в путь с несколькими членами племени. Вашим первым препятствием стал тот факт, что на пути \nк кладу развернулась огромная водная гладь, похоже, это озеро, но на карте тут вообще не должно быть никакой\nводы.";
+                    EventButt1.Visible = true;
+                    EventButt1.Text = "Давайте вернёмся и убедимся, что мы туда идём";
+                    if (rWood >= 3)
+                    {
+                        EventButt2.Visible = true;
+                        EventButt2.Text = "Быстро сделайте плот и поплыли напрямик";
+                    }
+                    EventButt3.Visible = true;
+                    EventButt3.Text = "Мы должны поискать обход";
+                    break;
+                case "1002":
+                    EventPicture.BackgroundImage = Properties.Resources.Lost;
+                    EventText.Text = "Кажется, пытаясь найти правильную дорогу к кладу мы малость заплутали и вышли на незнакомую нам местность. \nТем временем, приближается ночь...";
+                    EventButt1.Visible = true;
+                    EventButt1.Text = "Переждём ночь на открытом воздухе, не в первой";
+                    EventButt2.Visible = true;
+                    EventButt2.Text = "К чёрту всё это! Ищите дорогу домой пока нас не сожрали";
+                    EventButt3.Visible = true;
+                    EventButt3.Text = "Продолжаем искать путь к кладу, даже ночью";
+                    break;
+                case "1003": //Они обошли
+                    EventPicture.BackgroundImage = Properties.Resources.Lost;
+                    break;
+                case "1004": //Они рвутся домой
+                    break;
+                case "1005": //Они рвутся дальше
+                    break;
+            }
+            CheckRes();
+        }
+
+        private void EventAlgoritm()
+        {
+            N = rnd.Next(1, 21); //Собсна пытается подобрать айди ивента
+            if (EventN == N && EventN != 1) { N = EventN - 1; }
+            if (EventN == N && EventN == 1) { N = rnd.Next(2, 18); } // эти 2 строки для того, что бы ивенты не повторялись друг за другом
+            U = rnd.Next(1, 11); //Рандомизатор, 10% шанс что придёт торгаш
+            if (EventU == true)
+            {
+                switch (Convert.ToString(EventN))
+                {
+                    case "1000":
+                        EventN = 1001;
+                        break;
+                }
+            }
+            if (EventU == false && U == 9 && EventN != 999)
+            {
+                EventN = 999;
+                T = rnd.Next(1, 8);
+                B = rnd.Next(1, 8);
+                Check:
+                if (B == T)
+                {
+                    B = rnd.Next(1, 8);
+                    goto Check;
+                }
+                EventText.Text = "К вам в поселение пришёл торговец. Он предлагает поторговаться, он даст:\n";
+                switch (Convert.ToString(T)) //1 - люди, 2 - еда, 3 хилки, 4 - обыч. ресы, 5 - металл, 6 - оружие, 7 - алмазы. T - продаёт, B - требует
+                {
+                    case "1":
+                        R = 1;
+                        EventText.Text += "1 раба в обмен на ";
+                        break;
+                    case "2":
+                        R = rnd.Next(2,5);
+                        EventText.Text += "" + R + " ед. пищи в обмен на ";
+                        break;
+                    case "3":
+                        R = rnd.Next(1, 4);
+                        EventText.Text += "" + R + " ед. лекарств в обмен на ";
+                        break;
+                    case "4":
+                        R = rnd.Next(3, 6);
+                        EventText.Text += "" + R + " ед. примитив. ресурсов в обмен на ";
+                        break;
+                    case "5":
+                        R = rnd.Next(2, 5);
+                        EventText.Text += "" + R + " ед. металла в обмен на ";
+                        break;
+                    case "6":
+                        R = rnd.Next(2, 4);
+                        EventText.Text += "" + R + " ед. оружия в обмен на ";
+                        break;
+                    case "7":
+                        R = 1;
+                        EventText.Text += "1 алмаз в обмен на ";
+                        break;
+                }
+                switch (Convert.ToString(B)) //1 - люди, 2 - еда, 3 хилки, 4 - обыч. ресы, 5 - металл, 6 - оружие, 7 - алмазы. T - продаёт, B - требует
+                {
+                    case "1":
+                        P = 1;
+                        EventText.Text += "1 раба";
+                        TradeTrack.Maximum = rPeople - 1;
+                        break;
+                    case "2":
+                        P = rnd.Next(2, 5);
+                        EventText.Text += "" + P + " ед. пищи";
+                        TradeTrack.Maximum = rFood / P;
+                        break;
+                    case "3":
+                        P = rnd.Next(1, 4);
+                        EventText.Text += "" + P + " ед. лекарств";
+                        TradeTrack.Maximum = rHeal / P;
+                        break;
+                    case "4":
+                        P = rnd.Next(3, 6);
+                        EventText.Text += "" + P + " ед. примитив. ресурсов";
+                        TradeTrack.Maximum = rWood / P;
+                        break;
+                    case "5":
+                        P = rnd.Next(2, 5);
+                        EventText.Text += "" + P + " ед. металла";
+                        TradeTrack.Maximum = rMetal / P;
+                        break;
+                    case "6":
+                        P = rnd.Next(2, 4);
+                        EventText.Text += "" + P + " ед. оружия";
+                        TradeTrack.Maximum = rWeapon / P;
+                        break;
+                    case "7":
+                        P = 1;
+                        EventText.Text += "1 алмаз";
+                        TradeTrack.Maximum = rGold / P;
+                        break;
+                }
+                TradeTrack.Visible = true;
+            }
+            else
+            {
+                if (EventU == false)
+                {
+                    Y = rnd.Next(1, 101);
+                    if (rMorale <= 10 && Y >= 25)
+                    {
+                        N = rnd.Next(900, 903);
+                    }
+                    if (rFood == 0 && Y >= 25)
+                    {
+                        N = rnd.Next(800, 801);
+                    }
+                    if (RepTribe < 250 && Y >= 90)
+                    {
+                        N = 850;
+                    }
+                    if (RepCastle < 250 && Y >= 93)
+                    {
+                        N = 851;
+                    }
+                    if (RepCity < 250 && Y >= 94)
+                    {
+                        N = 852;
+                    }
+                    if (RepCity > 750 && Y >= 91 && HaveStat[1] == false && rGold >= 3)
+                    {
+                        N = 853;
+                    }
+                    if (RepTribe > 750 && Y >= 91 && HaveStat[3] == false && (rGold >= 4 || rWood >= 8))
+                    {
+                        N = 854;
+                    }
+                    if (HaveStat[2] == false && Y >= 95 && rPeople >= 3) { N = 855; }
+                    if (HaveStat[5] == false && Y >= 95 && rWood >= 12) { N = 856; }
+                    //if (Y >= 0 && EventCheck[0] == 0)
+                    //{
+                    //    N = 1000;
+                    //    EventU = true;                     //тут типо уникальная цепочка ивентов, но я понял, что от неё говной воняет!
+                    //    EventCheck[0] = 1;
+                    //}
+                    EventN = N;
+                }
+            }
+        }
+
+        private void EventButt1_Click(object sender, EventArgs e)
+        {
+            ShutDownString();
+            switch (Convert.ToString(EventN))
+            {
+                case "0":
+                    break;
+                case "1":
+                    rPeople++; BonPeople.Text = "+1";
+                    rMorale -= 3; BonMorale.Text = "-3";
+                    RepCastle -= rnd.Next(10, 31);
+                    break;
+                case "2":
+                    N = rnd.Next(1, 5);
+                    if ( rHeal >= N) { rHeal -= N;  BonHeal.Text = "-" + N; } else { U = rnd.Next(1, 3); rPeople -= U; rMorale -= 4;  BonPeople.Text = "-" + U;  BonMorale.Text = "-4"; }
+                    Y = rnd.Next(1, 5); rMetal += Y;  BonMetal.Text = "+" + Y;
+                    break;
+                case "3":
+                    N = rnd.Next(3, 6);
+                    rFood += N; BonFood.Text = "+" + N;
+                    break;
+                case "4":
+                    rHeal -= 6;  BonHeal.Text = "-" + 6;
+                    rMorale += 2; BonMorale.Text = "+2";
+                    break;
+                case "5":
+                    rWood -= 6; BonWood.Text = "-6";
+                    break;
+                case "6":
+                    N = rnd.Next(8, 11);
+                    rFood += N; BonFood.Text = "+" + N;
+                    break;
+                case "7":
+                    rMorale += 5; BonMorale.Text = "+5";
+                    rPeople -= 1; BonPeople.Text = "-1";
+                    break;
+                case "8":
+                    N = rnd.Next(1, 21);
+                    if (N == 20) { rGold += 5; BonGold.Text = "+5"; }
+                    rMetal -= 5; BonMetal.Text = "-5";
+                    break;
+                case "9":
+                    rMorale -= 20; BonMorale.Text = "-20";
+                    break;
+                case "10":
+                    N = rnd.Next(6, 13);
+                    rFood += N; BonFood.Text = "+" + N;
+                    rWood++; BonWood.Text = "+1";
+                    rWeapon -= 4; BonWeapon.Text = "-4";
+                    break;
+                case "11":
+                    N = rnd.Next(1, 6);
+                    if (N == 3) { rMetal += 2; BonMetal.Text = "+2"; }
+                    if (N == 4) { rWood += 2; BonWood.Text = "+2"; }
+                    rWeapon -= 1; BonWeapon.Text = "-1";
+                    rHeal -= 1; BonHeal.Text = "-1";
+                    break;
+                case "12":
+                    rFood++; BonFood.Text = "+1";
+                    break;
+                case "13":
+                    rMetal -= 4; BonMetal.Text = "-4";
+                    rWeapon += 4; BonWeapon.Text = "+4";
+                    break;
+                case "14":
+                    rMetal--; BonMetal.Text = "-1";
+                    rGold += 8; BonGold.Text = "+8";
+                    RepCity -= 125;
+                    break;
+                case "15":
+                    RepCastle -= 50;
+                    rMorale += 5; BonMorale.Text = "+5";
+                    break;
+                case "16":
+                    EnemyDevLVL = 0;
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = rnd.Next(0, 6);
+                    EnemyNum = rnd.Next(2, 6);
+                    Battle();
+                    break;
+                case "17":
+                    rMetal -= 3; BonMetal.Text = "-3";
+                    rMorale -= 5; BonMorale.Text = "-5";
+                    rFood += 3; BonFood.Text = "+3";
+                    break;
+                case "18":
+                    N = rnd.Next(2, 6);
+                    rFood += 5; BonFood.Text = "+" + N;
+                    break;
+                case "19":
+                    EnemyDevLVL = 0;
+                    EnemyNum = rnd.Next(6, 11);
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = 3;
+                    N = rnd.Next(3, 10);
+                    rFood += N; BonFood.Text = "+" + N;
+                    N = rnd.Next(2, 7);
+                    rMetal += N; BonMetal.Text = "+" + N;
+                    N = rnd.Next(1, 2);
+                    rGold += N; BonGold.Text = "+" + N;
+                    N = rnd.Next(1, 5);
+                    rHeal += N; BonHeal.Text = "+" + N;
+                    rMorale += 10; BonMorale.Text = "+10";
+                    RepTribe -= 100;
+                    Battle();
+                    break;
+                case "20":
+                    rPeople--; BonPeople.Text = "-1";
+                    RepCity += 30; 
+                    break;
+                case "800":
+                    rMorale -= 10; BonMorale.Text = "-10";
+                    break;
+                case "850":
+                    EnemyDevLVL = 0;
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = rnd.Next(0, 6);
+                    Battle();
+                    break;
+                case "851":
+                    EnemyDevLVL = 1;
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = rnd.Next(0, 6);
+                    Battle();
+                    break;
+                case "852":
+                    EnemyDevLVL = 2;
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = rnd.Next(0, 6);
+                    Battle();
+                    break;
+                case "853":
+                    HaveStat[1] = true;
+                    rGold -= 4; BonGold.Text = "-4";
+                    break;
+                case "854":
+                    HaveStat[3] = true;
+                    rGold -= 4; BonGold.Text = "-4";
+                    break;
+                case "855":
+                    HaveStat[2] = true;
+                    rMorale += 6; BonMorale.Text = "+6";
+                    break;
+                case "856":
+                    HaveStat[5] = true;
+                    rWood -= 12; BonWood.Text = "-12";
+                    break;
+                case "900":
+                    rFood -= rPeople; BonFood.Text = "-" + rPeople;
+                    rMorale += 25; BonMorale.Text = "+25";
+                    break;
+                case "901":
+                    rMorale -= 10; BonMorale.Text = "-10";
+                    break;
+                case "902":
+                    rMorale -= 10; BonMorale.Text = "-10";
+                    break;
+                case "999":
+                    TradeTrack.Visible = false;
+                    switch (Convert.ToString(T))
+                    {
+                        case "1":
+                            rPeople += TradeTrack.Value;
+                            BonPeople.Text = "+" + TradeTrack.Value * R;
+                            break;
+                        case "2":
+                            rFood += TradeTrack.Value * R;
+                            BonFood.Text = "+" + TradeTrack.Value * R;
+                            break;
+                        case "3":
+                            rHeal += TradeTrack.Value * R;
+                            BonHeal.Text = "+" + TradeTrack.Value * R;
+                            break;
+                        case "4":
+                            rWood += TradeTrack.Value * R;
+                            BonWood.Text = "+" + TradeTrack.Value * R;
+                            break;
+                        case "5":
+                            rMetal += TradeTrack.Value * R;
+                            BonMetal.Text = "+" + TradeTrack.Value * R;
+                            break;
+                        case "6":
+                            rWeapon += TradeTrack.Value * R;
+                            BonWeapon.Text = "+" + TradeTrack.Value * R;
+                            break;
+                        case "7":
+                            rGold += TradeTrack.Value * R;
+                            BonGold.Text = "+" + TradeTrack.Value * R;
+                            break;
+                    }
+                    switch (Convert.ToString(B))
+                    {
+                        case "1":
+                            rPeople -= TradeTrack.Value;
+                            BonPeople.Text = "-" + TradeTrack.Value * P;
+                            break;
+                        case "2":
+                            rFood -= TradeTrack.Value * P;
+                            BonFood.Text = "-" + TradeTrack.Value * P;
+                            break;
+                        case "3":
+                            rHeal -= TradeTrack.Value * P;
+                            BonHeal.Text = "-" + TradeTrack.Value * P;
+                            break;
+                        case "4":
+                            rWood -= TradeTrack.Value * P;
+                            BonWood.Text = "-" + TradeTrack.Value * P;
+                            break;
+                        case "5":
+                            rMetal -= TradeTrack.Value * P;
+                            BonMetal.Text = "-" + TradeTrack.Value * P;
+                            break;
+                        case "6":
+                            rWeapon -= TradeTrack.Value * P;
+                            BonWeapon.Text = "-" + TradeTrack.Value * P;
+                            break;
+                        case "7":
+                            rGold -= TradeTrack.Value * P;
+                            BonGold.Text = "-" + TradeTrack.Value * P;
+                            break;
+                    }
+                    TradeTrack.Value = 0;
+                    break;
+                case "1000":
+                    EventN = 1001;
+                    EventU = true;
+                    break;
+                case "1001":
+                    EventN = 1002;
+                    break;
+                case "1002":
+                    EventN = 1004;
+                    break;
+            }
+            if (BattleGo == false)
+            {
+                EventAlgoritm();
+                EventLoad();
+            }
+            BonusShow.Start();
+        }
+
+        private void EventButt2_Click(object sender, EventArgs e)
+        {
+            ShutDownString();
+            switch (Convert.ToString(EventN))
+            {
+                case "1":
+                    rMorale += 3;  BonMorale.Text = "+3";
+                    break;
+                case "2":
+                    rMetal++;  BonMetal.Text = "+1";
+                    break;
+                case "3":
+                    rWeapon -= 2;  BonWeapon.Text = "-2";
+                    N = rnd.Next(6, 10);
+                    rFood += N;  BonFood.Text = "+" + N;
+                    break;
+                case "4":
+                    rHeal -= 2; BonHeal.Text = "-" + 2;
+                    N = rnd.Next(1, 5);
+                    if (N == 4) { } else { rPeople--; BonPeople.Text = "-1"; }
+                    break;
+                case "5":
+                    rMetal -= 6; BonMetal.Text = "-6";
+                    rMorale += 3; BonMorale.Text = "+3";
+                    break;
+                case "6":
+                    N = rnd.Next(1, 3);
+                    U = rnd.Next(2, 4);
+                    rFood += N; BonFood.Text = "+" + N;
+                    rHeal += U; BonHeal.Text = "+" + U;
+                    break;
+                case "7":
+                    N = rnd.Next(1, 6); if (N == 5) { rPeople -= 1; BonPeople.Text = "-1"; BonGold.Text = "-" + rGold; rGold = 0; }
+                    rMorale -= 12; BonMorale.Text = "-12";
+                    break;
+                case "9":
+                    rFood -= 4; BonFood.Text = "-4";
+                    break;
+                case "10":
+                    N = rnd.Next(5, 12);
+                    Y = rnd.Next(1, 4);
+                    if (Y == 3 && rHeal <= 1) { rPeople--; BonPeople.Text = "-1"; } if (Y == 3 && rHeal >= 1) { rHeal--; BonHeal.Text = "-1"; }
+                    rFood += N; BonFood.Text = "+" + N;
+                    rWood++; BonWood.Text = "+1";
+                    rWeapon -= 2; BonWeapon.Text = "-2";
+                    break;
+                case "11":
+                    rPeople -= 1; BonPeople.Text = "-1";
+                    break;
+                case "12":
+                    rHeal -= 2; BonHeal.Text = "-2";
+                    rPeople++; BonPeople.Text = "+1"; 
+                    break;
+                case "13":
+                    rWood -= 4; BonWood.Text = "-4";
+                    rWeapon += 2; BonWeapon.Text = "+2";
+                    break;
+                case "14":
+                    rPeople -= 2; BonPeople.Text = "-2";
+                    rGold += 4; BonGold.Text = "+4";
+                    rMorale -= 7; BonMorale.Text = "-7";
+                    RepCity += 20;
+                    break;
+                case "15":
+                    rGold -= 2; BonGold.Text = "-2";
+                    break;
+                case "16":
+                    rMorale -= 12; BonMorale.Text = "-12";
+                    break;
+                case "17":
+                    rFood += 3; BonFood.Text = "+3";
+                    rWood -= 3; BonWood.Text = "-3";
+                    break;
+                case "18":
+                    N = rnd.Next(1, 5);
+                    RepCastle -= 50 * N;
+                    rPeople += N; BonPeople.Text = "+" + N;
+                    break;
+                case "19":
+                    EnemyDevLVL = 1;
+                    EnemyNum = rnd.Next(6, 11);
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = 3;
+                    N = rnd.Next(5, 13);
+                    rFood += N; BonFood.Text = "+" + N;
+                    N = rnd.Next(3, 9);
+                    rMetal += N; BonMetal.Text = "+" + N;
+                    N = rnd.Next(2, 3);
+                    rGold += N; BonGold.Text = "+" + N;
+                    N = rnd.Next(2, 7);
+                    rHeal += N; BonHeal.Text = "+" + N;
+                    rMorale += 10; BonMorale.Text = "+10";
+                    RepCastle -= 100;
+                    Battle();
+                    break;
+                case "800":
+                    rWood -= 3; BonWood.Text = "-3";
+                    rFood++; BonFood.Text = "+1";
+                    break;
+                case "850":
+                    BonWood.Text = "-" + rWood; BonHeal.Text = "-" + rHeal; BonMetal.Text = "-" + rMetal; BonFood.Text = "-" + (rFood / 2);
+                    rWood = 0; rHeal = 0; rMetal = 0; rFood /= 2;
+                    break;
+                case "851":
+                    BonWood.Text = "-" + rWood; BonHeal.Text = "-" + rHeal; BonMetal.Text = "-" + rMetal; BonFood.Text = "-" + (rFood / 2);
+                    rWood = 0; rHeal = 0; rMetal = 0; rFood /= 2;
+                    break;
+                case "852":
+                    BonWood.Text = "-" + rWood; BonHeal.Text = "-" + rHeal; BonMetal.Text = "-" + rMetal; BonFood.Text = "-" + (rFood / 2);
+                    rWood = 0; rHeal = 0; rMetal = 0; rFood /= 2;
+                    break;
+                case "853":
+                    HaveStat[1] = true;
+                    rGold -= 3; BonGold.Text = "-3";
+                    RepCity -= rnd.Next(21, 60);
+                    break;
+                case "854":
+                    EnemyDevLVL = 0;
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = rnd.Next(0, 6);
+                    HaveStat[3] = true;
+                    EnemyNum = rnd.Next(5, 10);
+                    RepTribe -= 250;
+                    rMorale += 10; BonMorale.Text = "+10";
+                    rFood += 3; BonFood.Text = "+3";
+                    Battle();
+                    break;
+                case "855":
+                    rHeal -= 6; BonHeal.Text = "-6";
+                    N = rnd.Next(1, 11); if (N == 5) { rPeople -= 1; BonPeople.Text = "-1"; HaveStat[2] = true; }
+                    break;
+                case "900":
+                    rWeapon -= 2; BonWeapon.Text = "-2";
+                    rPeople--; BonPeople.Text = "-1";
+                    rMorale += 12; BonMorale.Text = "+12";
+                    break;
+                case "901":
+                    rMorale = 50; BonMorale.Text = "=50";
+                    N = rnd.Next(1, (rPeople));
+                    rPeople -= N; BonPeople.Text = "-" + N;
+                    rWeapon -= N / 2; BonWeapon.Text = "-" + (N/2);
+                    break;
+                case "902":
+                    N = rnd.Next(1, 11);
+                    if (N == 10) { rMorale += 20; BonMorale.Text = "+20"; } else { rMorale = 0; BonMorale.Text = "=0"; rPeople--; BonPeople.Text = "-1"; }
+                    break;
+                case "999":
+                    TradeTrack.Visible = false;
+                    break;
+                case "1000":
+                    EventU = false;
+                    break;
+                case "1001":
+                    EventN = 1003;
+                    rWood -= 3; BonWood.Text = "-3";
+                    break;
+                case "1002":
+                    EventN = 1004;
+                    break;
+            }
+            if (BattleGo == false)
+            {
+                EventAlgoritm();
+                EventLoad();
+            }
+            BonusShow.Start();
+        }
+
+        private void EventButt3_Click(object sender, EventArgs e)
+        {
+            ShutDownString();
+            switch (Convert.ToString(EventN))
+            {
+                case "1":
+                    rMorale--;  BonMorale.Text = "-1";
+                    rWood++;  BonWood.Text = "+1";
+                    break;
+                case "2":
+                    rWood++;  BonWood.Text = "+1";
+                    break;
+                case "3":
+                    N = rnd.Next(1, 3);
+                    if (N == 2) { rHeal++;  BonHeal.Text = "+1"; }
+                    if (N == 1) { rWood++;  BonWood.Text = "+1"; }
+                    rFood++;  BonFood.Text = "+1";
+                    break;
+                case "4":
+                    rPeople--; BonPeople.Text = "-1";
+                    rMorale -= 3; BonMorale.Text = "-3";
+                    break;
+                case "5":
+                    rGold -= 2; BonGold.Text = "-2";
+                    RepTribe += 25;
+                    break;
+                case "6":
+                    rFood += 1; BonFood.Text = "+" + 1;
+                    rMorale += 20; BonMorale.Text = "+20";
+                    break;
+                case "7":
+                    N = rnd.Next(1, 3);
+                    if (N == 2) { rMorale += 2; BonMorale.Text = "+2"; }
+                    rPeople--; BonPeople.Text = "-1";
+                    rFood++; BonFood.Text = "+1";
+                    break;
+                case "8":
+                    rHeal--; BonHeal.Text = "-1";
+                    rMorale += 2; BonMorale.Text = "+2";
+                    break;
+                case "9":
+                    rWood -= 4; BonWood.Text = "-4";
+                    break;
+                case "10":
+                    N = rnd.Next(3, 10);
+                    Y = rnd.Next(1, 4);
+                    if (Y == 3 && rHeal <= 4) { rPeople -= 2; BonPeople.Text = "-2"; }
+                    if (Y == 3 && rHeal >= 4) { rHeal -= 4; BonHeal.Text = "-4"; }
+                    rFood += N; BonFood.Text = "+" + N;
+                    break;
+                case "11":
+                    N = rnd.Next(1, 4);
+                    if (N != 3) { rPeople -= 1; BonPeople.Text = "-1"; rMorale -= 1; BonMorale.Text = "-1"; } else { rMorale += 4; BonMorale.Text = "+4"; }
+                    break;
+                case "12":
+                    rHeal -= 2; BonHeal.Text = "-2";
+                    rWeapon += 3; BonWeapon.Text = "+3";
+                    break;
+                case "13":
+                    rGold -= 2; BonGold.Text = "-2";
+                    rWeapon += 3; BonWeapon.Text = "+2";
+                    RepCity += 10;
+                    break;
+                case "14":
+                    RepCastle += 25;
+                    RepCity -= 10;
+                    rGold++; BonGold.Text = "+1";
+                    break;
+                case "15":
+                    rFood -= 4; BonFood.Text = "-4";
+                    break;
+                case "16":
+                    rMorale += 3; BonMorale.Text = "+3";
+                    RepTribe -= 33;
+                    break;
+                case "17":
+                    N = rnd.Next(7, 13);
+                    HaveStat[3] = false;
+                    rFood += N; BonFood.Text = "+" + N;
+                    break;
+                case "18":
+                    N = rnd.Next(5, 13);
+                    rWeapon--; BonWeapon.Text = "-1";
+                    rFood += N; BonFood.Text = "+" + N;
+                    RepCastle -= 65;
+                    break;
+                case "19":
+                    EnemyDevLVL = 2;
+                    EnemyNum = rnd.Next(6, 11);
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = 3;
+                    N = rnd.Next(8, 17);
+                    rFood += N; BonFood.Text = "+" + N;
+                    N = rnd.Next(6, 11);
+                    rMetal += N; BonMetal.Text = "+" + N;
+                    N = rnd.Next(3, 5);
+                    rGold += N; BonGold.Text = "+" + N;
+                    N = rnd.Next(4, 9);
+                    rHeal += N; BonHeal.Text = "+" + N;
+                    rMorale += 10; BonMorale.Text = "+10";
+                    RepCity -= 100;
+                    Battle();
+                    break;
+                case "20":
+                    rPeople--; BonPeople.Text = "-1";
+                    N = rnd.Next(1, 3);
+                    rGold += N; BonGold.Text = "+" + N;
+                    break;
+                case "800":
+                    rFood += rPeople; BonFood.Text = "+" + rPeople;
+                    rHeal -= rPeople; BonHeal.Text = "-" + rPeople;
+                    rMorale += 3; BonMorale.Text = "+3";
+                    break;
+                case "850":
+                    rGold -= 6;
+                    break;
+                case "851":
+                    rGold -= 6;
+                    break;
+                case "852":
+                    rGold -= 6;
+                    break;
+                case "855":
+                    N = rnd.Next(1, 5); if (N == 3) { rPeople -= 1; BonPeople.Text = "-1"; HaveStat[2] = true; }
+                    break;
+                case "900":
+                    rMorale -= 8; BonMorale.Text = "-8";
+                    break;
+                case "901":
+                    rMorale = 40; BonMorale.Text = "=40";
+                    if (rHeal >= 2) { N = rnd.Next(1, rHeal); rHeal -= N; BonHeal.Text = "-" + N; }
+                    if (rWood >= 2) { N = rnd.Next(1, rWood); rWood -= N; BonWood.Text = "-" + N; }
+                    if (rMetal >= 2) { N = rnd.Next(1, rMetal); rMetal -= N; BonMetal.Text = "-" + N; }
+                    break;
+                case "902":
+                    N = rnd.Next(1, 3);
+                    if (N == 2) { rMorale += 10; BonMorale.Text = "+10"; }
+                    rPeople--; BonPeople.Text = "-1";
+                    break;
+                case "1001":
+                    rFood -= 2; BonFood.Text = "-2";
+                    EventN = 1003;
+                    break;
+                case "1002":
+                    EventN = 1005;
+                    rMorale -= 5; BonMorale.Text = "-5";
+                    break;
+            }
+            if (BattleGo == false)
+            {
+                EventAlgoritm();
+                EventLoad();
+            }
+            BonusShow.Start();
+        }
+
+        private void EventButt4_Click(object sender, EventArgs e)
+        {
+            ShutDownString();
+            switch (Convert.ToString(EventN))
+            {
+                case "1":
+                    rFood++; BonFood.Text = "+1";
+                    break;
+                case "3":
+                    rMorale += 5; BonMorale.Text = "+5";
+                    rFood++; BonFood.Text = "+1";
+                    break;
+                case "5":
+                    rMorale -= 12; BonMorale.Text = "-12";
+                    break;
+                case "6":
+                    rFood += 2;
+                    RepTribe += rnd.Next(20, 51);
+                    break;
+                case "7":
+                    rPeople--; BonPeople.Text = "-1";
+                    rGold++; BonGold.Text = "+1";
+                    break;
+                case "8":
+                    N = rnd.Next(1, 101);
+                    if (N == 20) { rGold += 5; BonGold.Text = "+5"; }
+                    rWood -= 5; BonWood.Text = "-5";
+                    break;
+                case "9":
+                    rGold -= 2; BonGold.Text = "-2";
+                    break;
+                case "12":
+                    N = rnd.Next(1, 6);
+                    if (N == 5) { rPeople--; BonPeople.Text = "-1"; rWeapon += 1; BonWeapon.Text = "+1"; } else { rWeapon += 3; BonWeapon.Text = "+3"; }
+                    RepCity -= 20;
+                    rMorale--; BonMorale.Text = "-1";
+                    break;
+                case "13":
+                    rFood -= 2; BonFood.Text = "-2";
+                    rHeal -= 2; BonHeal.Text = "-2";
+                    rWeapon += 2; BonWeapon.Text = "+2";
+                    RepCastle += 10;
+                    break;
+                case "15":
+                    RepCastle -= 25;
+                    break;
+                case "16":
+                    rWeapon -= 2; BonWeapon.Text = "-2";
+                    break;
+                case "17":
+                    rMorale -= 5; BonMorale.Text = "-5";
+                    break;
+                case "18":
+                    RepCastle -= 20;
+                    rFood += 8; BonFood.Text = "+8";
+                    break;
+                case "19":
+                    rMorale -= 10; BonMorale.Text = "-10";
+                    RepCastle++;
+                    RepCity++;
+                    RepTribe++;
+                    break;
+                case "20":
+                    N = rnd.Next(3, 8);
+                    rFood += N; BonFood.Text = "+" + N;
+                    rMetal++; BonMetal.Text = "+1";
+                    RepCity -= 40;
+                    break;
+                case "800":
+                    rPeople--; BonPeople.Text = "-1";
+                    rFood++; BonFood.Text = "+1";
+                    break;
+                case "854":
+                    HaveStat[3] = true;
+                    rWood -= 8; BonWood.Text = "-8";
+                    break;
+                case "855":
+                    RepCity -= 25;
+                    rGold--; BonGold.Text = "-1";
+                    break;
+                case "900":
+                    rGold -= rPeople; BonGold.Text = "-" + rPeople;
+                    rMorale += 30; BonMorale.Text = "+30";
+                    break;
+                case "902":
+                    rWood -= 10; BonWood.Text = "+10";
+                    rMorale += 12; BonMorale.Text = "+12";
+                    break;
+            }
+            if (BattleGo == false)
+            {
+                EventAlgoritm();
+                EventLoad();
+            }
+            BonusShow.Start();
+        }
+
+        private void EventButt5_Click(object sender, EventArgs e)
+        {
+            ShutDownString();
+            switch (Convert.ToString(EventN))
+            {
+                case "1":
+                    RepCastle += 15;
+                    break;
+                case "5":
+                    RepCastle -= 25;
+                    break;
+                case "6":
+                    HaveStat[0] = true;
+                    break;
+                case "9":
+                    rPeople -= 1; BonPeople.Text = "-1";
+                    break;
+                case "10":
+                    N = rnd.Next(3, 7);
+                    rFood += N; BonFood.Text = "+" + N;
+                    break;
+                case "12":
+                    rHeal -= 2; BonHeal.Text = "-2";
+                    RepCity += 25;
+                    break;
+                case "13":
+                    rFood++; BonFood.Text = "+1";
+                    break;
+                case "14":
+                    rMetal--; BonMetal.Text = "-1";
+                    rGold += 8; BonGold.Text = "+8";
+                    RepCity -= 50;
+                    break;
+                case "15":
+                    RepCity -= 10;
+                    RepCastle -= 10;
+                    break;
+                case "16":
+                    rMorale -= 30; BonMorale.Text = "-30";
+                    RepTribe += 30;
+                    break;
+                case "17":
+                    RepCastle -= 30;
+                    rFood += 5;
+                    break;
+                case "18":
+                    rFood += 15; BonFood.Text = "+15";
+                    rGold -= 2; BonGold.Text = "-2";
+                    RepCastle += 12;
+                    break;
+                case "19":
+                    rWeapon--; BonWeapon.Text = "-1";
+                    N = rnd.Next(3, 8);
+                    rFood += N; BonFood.Text = "+" + N;
+                    rMorale -= 3; BonMorale.Text = "-3";
+                    break;
+                case "20":
+                    RepCity -= 20;
+                    rMetal++; BonMetal.Text = "+1";
+                    rHeal++; BonHeal.Text = "+1";
+                    break;
+                case "900":
+                    N = rnd.Next(1, 7);
+                    if (N == 6) { rMorale += 8; BonMorale.Text = "+8"; } else { rMorale -= 15; BonMorale.Text = "-15"; }
+                    break;
+                case "902":
+                    rHeal -= rPeople; BonWood.Text = "-" + rPeople;
+                    rMorale += rPeople + 3; BonMorale.Text = "+" + (rPeople + 3);
+                    break;
+            }
+            if (BattleGo == false)
+            {
+                EventAlgoritm();
+                EventLoad();
+            }
+            BonusShow.Start();
+        }
+
+        private void EventButt6_Click(object sender, EventArgs e)
+        {
+            switch (Convert.ToString(EventN))
+            {
+                case "9":
+                    EnemyDevLVL = 0;
+                    RepTribe -= 50;
+                    EnemyNum = rnd.Next(2, 7);
+                    TimeBattle = Convert.ToByte(rnd.Next(0, 6));
+                    PlaceBattle = rnd.Next(0, 6);
+                    Battle();
+                    break;
+                case "14":
+                    rGold += 3; BonGold.Text = "+3";
+                    RepCity -= 30;
+                    break;
+                case "15":
+                    rGold -= 4; BonGold.Text = "-4";
+                    RepCastle += 30;
+                    break;
+                case "18":
+                    rPeople--; BonPeople.Text = "-1";
+                    rGold += 2; BonGold.Text = "+2";
+                    RepCastle += 15;
+                    break;
+                case "19":
+                    rMorale += 6; BonMorale.Text = "+6";
+                    if (rHeal <= 3)
+                    {
+                        N = rnd.Next(1, 3);
+                        rPeople -= N; BonPeople.Text = "-" + N;
+                        BonHeal.Text = "-" + rHeal;
+                        rHeal = 0; 
+                    }
+                    else
+                    {
+                        rHeal -= 3; BonHeal.Text = "-3";
+                        N = rnd.Next(1, 13);
+                        if (N == 12) { rPeople--; BonPeople.Text = "-1"; }
+                    }
+                    break;
+                case "902":
+                    rMetal -= 6; BonMetal.Text = "-6";
+                    rGold -= 6; BonGold.Text = "-6";
+                    rMorale += 35; BonMorale.Text = "+35";
+                    break;
+            }
+            if (BattleGo == false)
+            {
+                EventAlgoritm();
+                EventLoad();
+            }
+            BonusShow.Start();
+        }
+
+        public void GG()
+        {
+            HideGameplay();
+            NumDay.Visible = false;
+            SaveGame.Visible = false;
+            NumFood.Visible = false;
+            NumGold.Visible = false;
+            NumHeal.Visible = false;
+            NumMetal.Visible = false;
+            NumMorale.Visible = false;
+            NumPeople.Visible = false;
+            NumWeapon.Visible = false;
+            NumWoodStone.Visible = false;
+            BonHeal.Visible = false;
+            BonGold.Visible = false;
+            BonFood.Visible = false;
+            BonMetal.Visible = false;
+            BonMorale.Visible = false;
+            BonPeople.Visible = false;
+            BonWeapon.Visible = false;
+            BonWood.Visible = false;
+            ButtStat.Visible = false;
+            EventText.Text = "Вы проиграли";
+            EventPicture.BackgroundImage = Properties.Resources.GG;
+            EventPicture.Visible = true;
+            EventText.Visible = true;
+        }
+
+        public void Win()
+        {
+            HideGameplay();
+            NumDay.Visible = false;
+            SaveGame.Visible = false;
+            NumFood.Visible = false;
+            NumGold.Visible = false;
+            NumHeal.Visible = false;
+            NumMetal.Visible = false;
+            NumMorale.Visible = false;
+            NumPeople.Visible = false;
+            NumWeapon.Visible = false;
+            NumWoodStone.Visible = false;
+            BonHeal.Visible = false;
+            BonGold.Visible = false;
+            BonFood.Visible = false;
+            BonMetal.Visible = false;
+            BonMorale.Visible = false;
+            BonPeople.Visible = false;
+            BonWeapon.Visible = false;
+            BonWood.Visible = false;
+            EventText.Text = "Ого, вы прожили 100 дней. Вы победили!";
+            EventPicture.BackgroundImage = Properties.Resources.Win;
+            EventPicture.Visible = true;
+            EventText.Visible = true;
+        }
+
+        private void Battle()
+        {
+            PanelBattle.Location = new Point(10, 10);
+            BattleGo = true;
+            LaberYouMan.Text = "Ваши силы: " + rPeople;
+            LaberEnemyMan.Text = "Вражеские силы: " + EnemyNum;
+            switch (Convert.ToString(DevLVL))
+            {
+                case "0":
+                    YouDev.Text = "Уровень развития у вас: Племя";
+                    break;
+                case "1":
+                    YouDev.Text = "Уровень развития у вас: Средние века";
+                    break;
+                case "2":
+                    YouDev.Text = "Уровень развития у вас: Индустриальный";
+                    break;
+                case "3":
+                    YouDev.Text = "Уровень развития у вас: Пост-индустриальный";
+                    break;
+            }
+            switch (Convert.ToString(EnemyDevLVL))
+            {
+                case "0":
+                    EnemyDev.Text = "Уровень развития врага: Племя";
+                    break;
+                case "1":
+                    EnemyDev.Text = "Уровень развития врага: Средние века";
+                    break;
+                case "2":
+                    EnemyDev.Text = "Уровень развития врага: Индустриальный";
+                    break;
+                case "3":
+                    EnemyDev.Text = "Уровень развития врага: Пост-индустриальный";
+                    break;
+            }
+            switch (Convert.ToString(TimeBattle))
+            {
+                case "0":
+                    BattleTime.Text = "Время: Раннее утро";
+                    break;
+                case "1":
+                    BattleTime.Text = "Время: Утро";
+                    break;
+                case "2":
+                    BattleTime.Text = "Время: Середина дня";
+                    break;
+                case "3":
+                    BattleTime.Text = "Время: Вечер";
+                    break;
+                case "4":
+                    BattleTime.Text = "Время: Ночь";
+                    break;
+                case "5":
+                    BattleTime.Text = "Время: Глубокая ночь";
+                    break;
+            }
+            switch (Convert.ToString(PlaceBattle))
+            {
+                case "0":
+                    BattlePlace.Text = "Место битвы: Открытое поле";
+                    break;
+                case "1":
+                    BattlePlace.Text = "Место битвы: Лесной массив";
+                    break;
+                case "2":
+                    BattlePlace.Text = "Место битвы: Ваше поселение";
+                    break;
+                case "3":
+                    BattlePlace.Text = "Место битвы: Мост через реку";
+                    break;
+                case "4":
+                    BattlePlace.Text = "Место битвы: Холм";
+                    break;
+                case "5":
+                    BattlePlace.Text = "Место битвы: Болото";
+                    break;
+            }
+            GenerateBattleText();
+            PanelPic.BackgroundImage = Properties.Resources.Battle1;
+            BattleWeapon.Text = "Кол. оружия: " + rWeapon;
+            BattleWood.Text = "Кол. ресурсов: " + rWood;
+            IDD = rnd.Next(0, 1);
+            ButtStat.Visible = false;
+            PanelBattle.Visible = true;
+            EventButt1.Visible = false;
+            EventButt2.Visible = false;
+            EventButt3.Visible = false;
+            EventButt4.Visible = false;
+            EventButt5.Visible = false;
+            EventButt6.Visible = false;
+            Tactic1.Visible = true;
+            Tactic2.Visible = true;
+            Tactic3.Visible = true;
+            Tactic4.Visible = true;
+            Tactic5.Visible = true;
+            Tactic6.Visible = true;
+            Tactic7.Visible = true;
+            Tactic8.Visible = true;
+            Tactic9.Visible = true;
+            Tactic10.Visible = true;
+            SaveGame.Visible = false;
+            ButtBattleWon.Visible = false;
+        }
+
+        private void GenerateBattleText()
+        {
+            IDD = rnd.Next(0, 8);
+            switch (Convert.ToString(IDD))
+            {
+                case "0":
+                    BattleText.Text += "Противник пошёл в прямую лобовую атаку на открытой местности";
+                    break;
+                case "1":
+                    BattleText.Text += "Протнивник не атакует и пытается выстроить оборону";
+                    break;
+                case "2":
+                    BattleText.Text += "Противник пропал из вашего поля зрения и где то ''спрятался''";
+                    break;
+                case "3":
+                    BattleText.Text += "Противник начал обстреливать ваши позиции издалека";
+                    break;
+                case "4":
+                    BattleText.Text += "Противник начал организованную атаку небольшими группами";
+                    break;
+                case "5":
+                    BattleText.Text += "Противник основательно окопался и готов отразить вашу наземную атаку";
+                    break;
+                case "6":
+                    BattleText.Text += "Противник собрал силы и начал агрессивно атаковать малыми кучами";
+                    break;
+                case "7":
+                    BattleText.Text += "Противник построился в большой квадрат, прикрылся щитами и медленно идёт к вам";
+                    break;
+            }
+        }
+        private void Fight()
+        {
+            BattleText.Text = "";
+            int Dmg1 = 0; int Dmg2 = 0; //1 - урон игрока, 2 - урон бота
+            int Ini1 = 0; int Ini2 = 0; //Инициатива. Если у бота больше или равно, чем у игрока - он бьёт первый
+            {
+                //0 - поле, 1 - лес, 2 - деревня, 3 - мост, 4 - холм, 5 - болото
+                //НАШИ: 0 - голые руки раш, 1 - вооружёные руки раш, 2 - Засада с оружием, 3 - обстрел позиций, 4 - баррикады, 5 - тяжеловооружёная атака, 6 - организованный раш, 7 - рассыпание
+                //ОНИ: 0 - тупой раш, 1 - попытка обороны, 2 - засада, 3 - обстрел позиций, 4 - аккуратная атака, 5 - окоп, 6 - умный раш, 7 - черепаха
+                Dmg2 = EnemyDevLVL - DevLVL;
+                if (HaveStat[1] == true) { Ini1++; }
+                if (HaveStat[5] == true && PlaceBattle == 2) { Dmg2--; }
+                if (IDT == 0 || IDT == 1) { Dmg2 += 2; Ini1 += 1; } //Тут устанавливаются "базовые" множители для тактики игрока
+                if (IDT == 1) { Dmg1 += 2; }
+                if (IDT == 2) { Ini1 += 3; }
+                if (IDT == 3) { Ini1 += 1; Dmg1 += 1; }
+                if (IDT == 4) { Dmg2 -= 2; }
+                if (IDT == 5) { Dmg2 -= 1; Dmg1 += 3; Ini1 -= 1; }
+                if (IDT == 6) { Ini2 += 1; Dmg1 += 2; }
+                if (IDT == 7) { Dmg2 -= 2; }
+                if (IDD == 0) { Dmg1 += 2; Ini2 += 1; } //Тут устанавливаются базовые множители для тактики бота
+                if (IDD == 1) { Dmg1 -= 1; Ini2 -= 1; }
+                if (IDD == 2) { Ini2 += 3; }
+                if (IDD == 3) { Dmg2 += 1; Ini2 += 1; }
+                if (IDD == 4) { Dmg1 -= 1; Dmg2 += 1; }
+                if (IDD == 5) { Dmg1 -= 3; Ini2 -= 1; }
+                if (IDD == 6) { Ini2 += 2; Dmg2 += 1; Dmg1 += 1; }
+                if (IDD == 7) { Dmg1 -= 3; Dmg2 -= 1; }
+                if ((IDT == 0 || IDT == 1) && TimeBattle >= 3) { Ini1 += 1; } //Проверки на ландшафт и время для игрока
+                if ((IDT == 0 || IDT == 1) && TimeBattle <= 2) { Ini1 -= 1; }
+                if ((IDT == 0 || IDT == 1) && PlaceBattle == 0) { Dmg1 += 1; Dmg2 += 1; }
+                if ((IDT == 0 || IDT == 1) && PlaceBattle == 2) { Ini1 += 1; }
+                if ((IDT == 0 || IDT == 1) && PlaceBattle == 3) { Ini1 -= 1; }
+                if ((IDT == 0 || IDT == 1) && PlaceBattle == 4) { Dmg1 -= 1; }
+                if ((IDT == 0 || IDT == 1) && PlaceBattle == 5) { Ini1 -= 2; }
+                if (IDT == 2 && PlaceBattle == 0) { Ini1 -= 3; }
+                if (IDT == 2 && (PlaceBattle == 2 || PlaceBattle == 5 || PlaceBattle == 1)) { Dmg1 += 1; }
+                if (IDT == 2 && PlaceBattle == 3) { Ini1 -= 2; }
+                if (IDT == 2 && PlaceBattle == 4) { Ini1 -= 1; }
+                if (IDT == 2 && TimeBattle >= 3) { Ini1 += 1; }
+                if (IDT == 2 && TimeBattle <= 2) { Ini1 -= 1; }
+                if (IDT == 3 && PlaceBattle == 0) { Dmg1 += 1; }
+                if (IDT == 3 && (PlaceBattle == 0 || PlaceBattle == 4 || PlaceBattle == 5)) { Ini1 += 1; }
+                if (IDT == 3 && PlaceBattle == 2) { Ini1 -= 1; Dmg1 -= 1; }
+                if (IDT == 3 && TimeBattle >= 3) { Ini1 -= 1; Dmg1 -= 1; }
+                if (IDT == 4 && PlaceBattle == 2) { Ini1 += 2; }
+                if (IDT == 4 && PlaceBattle == 3) { Dmg2 -= 1; }
+                if (IDT == 4 && PlaceBattle == 4) { Ini1 += 1; }
+                if (IDT == 4 && PlaceBattle == 5) { Ini1 -= 1; }
+                if (IDT == 4 && TimeBattle >= 3) { Ini1 -= 1; }
+                if (IDT == 5 && PlaceBattle == 0) { Ini1 -= 1; }
+                if (IDT == 5 && (PlaceBattle == 1 || PlaceBattle == 4)) { Ini1 += 1; }
+                if (IDT == 5 && PlaceBattle == 2) { Ini1 += 2; }
+                if (IDT == 5 && PlaceBattle == 5) { Dmg1 -= 2; Ini1 -= 1; }
+                if (IDT == 5 && TimeBattle == 5) { Ini1 -= 1; }
+                if (IDT == 5 && TimeBattle <= 1) { Ini1 += 1; }
+                if (IDT == 6 && PlaceBattle == 0) { Ini2 += 1; }
+                if (IDT == 6 && PlaceBattle == 2) { Dmg1 += 1; }
+                if (IDT == 6 && PlaceBattle == 3) { Ini1 += 1; }
+                if (IDT == 6 && PlaceBattle == 4) { Ini1 += 2; }
+                if (IDT == 6 && PlaceBattle == 0) { Ini1 -= 1; }
+                if (IDT == 6 && TimeBattle <= 2) { Ini1 += 1; }
+                if (IDT == 6 && TimeBattle == 3) { Ini2 += 1; }
+                if (IDT == 6 && TimeBattle == 5) { Ini1 += 1; }
+                if (IDT == 7 && (PlaceBattle == 0 || PlaceBattle == 3)) { Dmg2 += 1; }
+                if (IDT == 7 && PlaceBattle == 1) { Ini1 += 1; Dmg2 -= 1; }
+                if (IDT == 7 && PlaceBattle == 2) { Ini1 += 1; }
+                if (IDT == 7 && PlaceBattle == 4) { Dmg2 += 1; Ini2 += 1; }
+                if (IDT == 7 && PlaceBattle == 5) { Dmg2 -= 1; }
+                if (IDT == 7 && (TimeBattle == 0 || TimeBattle == 5)) { Dmg1 += 1; Ini2 -= 1; }
+                if (IDT == 7 && TimeBattle == 2) { Ini2 += 1; }
+                if (IDD == 0 && TimeBattle >= 3) { Ini2 += 1; } //Проверки на ландшафт и время для бота
+                if (IDD == 0 && TimeBattle <= 2) { Ini2 -= 1; }
+                if (IDD == 0 && PlaceBattle == 0) { Dmg2 += 1; Dmg1 += 1; }
+                if (IDD == 0 && PlaceBattle == 2) { Ini2 += 1; }
+                if (IDD == 0 && PlaceBattle == 3) { Ini2 -= 1; }
+                if (IDD == 0 && PlaceBattle == 4) { Dmg2 -= 1; }
+                if (IDD == 0 && PlaceBattle == 5) { Ini2 -= 1; }
+                if (IDD == 1 && TimeBattle >= 3) { Dmg1 += 1; }
+                if (IDD == 1 && (PlaceBattle == 0 || PlaceBattle == 2)) { Dmg1 += 1; }
+                if (IDD == 1 && PlaceBattle == 4) { Dmg2 += 1; }
+                if (IDD == 1 && PlaceBattle == 5) { Ini2 += 1; }
+                if (IDD == 2 && PlaceBattle == 0) { Ini2 -= 3; }
+                if (IDD == 2 && PlaceBattle == 3) { Ini2 -= 2; }
+                if (IDD == 2 && (PlaceBattle == 5 || PlaceBattle == 1 || PlaceBattle == 4)) { Dmg2 += 1; }
+                if (IDD == 2 && TimeBattle >= 3) { Ini2 += 1; }
+                if (IDD == 2 && TimeBattle <= 2) { Ini2 -= 1; }
+                if (IDD == 3 && (PlaceBattle == 0 || PlaceBattle == 5)) { Dmg2 += 2; }
+                if (IDD == 3 && (PlaceBattle == 3 || PlaceBattle == 4)) { Dmg2 += 1; }
+                if (IDD == 3 && (PlaceBattle == 1 || PlaceBattle == 2)) { Dmg2 -= 1; }
+                if (IDD == 3 && TimeBattle <= 2) { Dmg2 += 1; }
+                if (IDD == 3 && TimeBattle >= 3) { Ini2 -= 2; Dmg2 -= 1; }
+                if (IDD == 4 && PlaceBattle == 0 ) { Ini2 -= 1; }
+                if (IDD == 4 && (PlaceBattle == 3 || PlaceBattle == 2)) { Dmg2 += 1; }
+                if (IDD == 4 && PlaceBattle == 4) { Dmg2 -= 1; }
+                if (IDD == 4 && TimeBattle >= 3) { Ini1 -= 1; }
+                if (IDD == 5 && PlaceBattle == 1) { Ini2 += 1; }
+                if (IDD == 5 && PlaceBattle == 2) { Ini2 += 2; }
+                if (IDD == 5 && PlaceBattle == 5) { Dmg1 += 1; Ini1 += 1; }
+                if (IDD == 5 && TimeBattle >= 4) { Ini1 += 1; }
+                if (IDD == 6 && (PlaceBattle == 1 || PlaceBattle == 2 || PlaceBattle == 3)) { Ini2 += 2; }
+                if (IDD == 6 && PlaceBattle == 4) { Ini2 += 1; }
+                if (IDD == 6 && PlaceBattle == 5) { Ini2 -= 1; }
+                if (IDD == 6 && PlaceBattle == 0) { Dmg1 += 1; }
+                if (IDD == 6 && (TimeBattle == 0 || TimeBattle == 5)) { Ini2 += 1; }
+                if (IDD == 6 && (TimeBattle >= 1 && TimeBattle <= 4)) { Ini1 += 1; }
+                if (IDD == 7 && (PlaceBattle == 0 || PlaceBattle == 5)) { Dmg1 -= 1; }
+                if (IDD == 7 && (PlaceBattle != 0 && PlaceBattle != 5)) { Ini2 -= 1; }
+                if (IDD == 7 && TimeBattle == 0) { Ini1 += 1; }
+                if (IDD == 7 && TimeBattle >= 4) { Ini2 += 1; }
+                if ((IDT == 0 || IDT == 1) && IDD == 2) { Dmg2 += 1; } //Проверка на комбинации тактик
+                if ((IDT == 0 || IDT == 1) && IDD == 3) { Dmg2 -= 3; Ini2 -= 1; }   
+                if ((IDT == 0 || IDT == 1) && IDD == 5) { Dmg1 -= 1; Ini2 += 1; }
+                if ((IDT == 0 || IDT == 1) && IDD == 7) { Dmg1 -= 1; }
+                if ((IDD == 1 || IDD == 2 || IDD == 5) && (IDT == 2)) { Dmg1 = 0; Dmg2 = 0; Ini1 = 0; Ini2 = 0; rWeapon += 1; }
+                if ((IDD == 1 || IDD == 2 || IDD == 5) && (IDT == 4)) { Dmg1 = 0; Dmg2 = 0; Ini1 = 0; Ini2 = 0; rWood += 1; }
+                if ((IDD == 1 || IDD == 2 || IDD == 5) && (IDT == 7)) { Dmg1 = 0; Dmg2 = 0; Ini1 = 0; Ini2 = 0; }
+                if (IDT == 2 && IDD == 3) { Dmg1 = 0; Ini1 = 0; Ini2 += 3; }
+                if (IDT == 2 && IDD == 0) { Dmg1 += 1; }
+                if (IDT == 2 && IDD == 6) { Ini1 -= 3; }
+                if (IDT == 3 && IDD == 0 && PlaceBattle != 0 && PlaceBattle != 4) { Ini2 += 1; }
+                if (IDT == 3 && IDD == 1) { Dmg2 -= 3; }
+                if (IDT == 3 && IDD == 2) { Ini1 += 1; Dmg2 = 0; }
+                if (IDT == 3 && IDD == 4) { Ini1 += 1; Dmg2 += 1; }
+                if (IDT == 3 && IDD == 5) { Ini1 += 2; Dmg2 = 0; }
+                if (IDT == 3 && IDD == 6) { Ini1 -= 3; Dmg1 -= 1; }
+                if (IDT == 3 && IDD == 7) { Dmg1 -= 3; }
+                if (IDT == 4 && IDD == 0) { Dmg1 += 1; }
+                if (IDT == 4 && IDD == 3) { Ini1 -= 3; Dmg1 = 0; Ini2 += 1; Dmg2 += 1; }
+                if (IDT == 4 && IDD == 4) { Dmg2 += 1; }
+                if (IDT == 4 && IDD == 6) { Ini1 += 2; }
+                if (IDT == 5 && IDD == 1) { Ini1 += 1; }
+                if (IDT == 5 && IDD == 2) { Ini2 += 1; Dmg2 += 1; }
+                if (IDT == 5 && (IDD == 3 || IDD == 5)) { Dmg1 -= 1; }
+                if (IDT == 5 && IDD == 6) { Dmg2 -= 1; Dmg1 += 2; }
+                if (IDT == 6 && IDD == 2) { Dmg2 -= 1; Ini2 -= 1; }
+                if (IDT == 6 && IDD == 3) { Ini1 -= 1; }
+                if (IDT == 6 && IDD == 5) { Ini1 += 1; Dmg1 += 1; }
+                if (IDT == 6 && IDD == 6) { Ini2 += 1; }
+                if (IDT == 6 && IDD == 7) { Ini1 += 2; }
+                if (IDT == 7 && IDD == 0) { Ini2 += 1; }
+                if (IDT == 7 && IDD == 3) { Dmg2 -= 2; }
+                if (IDT == 7 && IDD == 6) { Ini2 += 1; Dmg2 += 1; }
+                if (IDT == 7 && IDD == 7) { Ini2 -= 1; }
+            } //Просто огромная скобка чтоб прятать условия
+            if (Ini2 >= Ini1)
+            {
+                int i = Math.Abs(Ini2 - Ini1);
+                if (i >= 5)
+                {
+                    BattleText.Text = "ОШЕЛОМЛЯЮЩЕЕ преимущество врага (" + Ini2 + " против вашей " + Ini1 + ")\n";
+                    Dmg2 += 1;
+                }
+                else
+                {
+                    BattleText.Text = "Инициатива у врага! (" + Ini2 + " против вашей " + Ini1 + ")\n";
+                }
+                if (i == 0)
+                {
+                    Dmg1 -= 1;
+                    Dmg2 -= 1;
+                }
+                if (Dmg1 < 0) { Dmg1 = 0; } if (Dmg2 < 0) { Dmg2 = 0; } 
+                rPeople -= Dmg2;
+                BattleText.Text += "Враг убил " + Dmg2 + " ваших людей\n";
+                if (rPeople >= 0)
+                {
+                    BattleText.Text += "Вы убили " + Dmg1 + " противников\n";
+                    EnemyNum -= Dmg1;
+                }
+            } // Проверка инициативы
+            else
+            {
+                int i = Math.Abs(Ini1 - Ini2);
+                if (i >= 5)
+                {
+                    BattleText.Text = "ОШЕЛОМЛЯЮЩЕЕ преимущество у вас (" + Ini2 + " против вашей " + Ini1 + ")\n";
+                    Dmg1 += 1;
+                }
+                else
+                {
+                    BattleText.Text = "Инициатива у вас! (" + Ini2 + " против вашей " + Ini1 + ")\n";
+                }
+                if (i == 0)
+                {
+                    Dmg1 -= 1;
+                    Dmg2 -= 1;
+                }
+                if (Dmg1 < 0) { Dmg1 = 0; } if (Dmg2 < 0) { Dmg2 = 0; }
+                EnemyNum -= Dmg1;
+                BattleText.Text += "Вы убили " + Dmg1 + " противников\n";
+                if (EnemyNum >= 0)
+                {
+                    BattleText.Text += "Враг убил " + Dmg2 + " ваших людей\n";
+                    rPeople -= Dmg2;
+                }
+            }
+            LaberYouMan.Text = "Ваши силы: " + rPeople;
+            LaberEnemyMan.Text = "Вражеские силы: " + EnemyNum;
+            BattleWeapon.Text = "Кол. оружия: " + rWeapon;
+            BattleWood.Text = "Кол. ресурсов: " + rWood;
+            GenerateBattleText();
+            if (rPeople <= 0)
+            {
+                PanelBattle.Visible = false;
+                GG();
+            }
+            if (EnemyNum <= 0)
+            {
+                Tactic1.Visible = false;
+                Tactic2.Visible = false;
+                Tactic3.Visible = false;
+                Tactic4.Visible = false;
+                Tactic5.Visible = false;
+                Tactic6.Visible = false;
+                Tactic7.Visible = false;
+                Tactic8.Visible = false;
+                Tactic9.Visible = false;
+                Tactic10.Visible = false;
+                ButtBattleWon.Visible = true;
+                BattleText.Text += "Все противники мертвы, вы победили!";
+            }
+        }
+
+        private void BonusShow_Tick(object sender, EventArgs e)
+        {
+            ShutDownString();
+        }
+
+        private void ShutDownString()
+        {
+            BonusShow.Stop();
+            BonFood.Text = "";
+            BonMorale.Text = "";
+            BonGold.Text = "";
+            BonWood.Text = "";
+            BonPeople.Text = "";
+            BonWeapon.Text = "";
+            BonMetal.Text = "";
+            BonHeal.Text = "";
+        }
+
+        private void TradeTrack_Scroll(object sender, EventArgs e)
+        {
+            EventButt1.Text = "Купить ";
+            switch (Convert.ToString(T)) //1 - люди, 2 - еда, 3 хилки, 4 - обыч. ресы, 5 - металл, 6 - оружие, 7 - алмазы. T - продаёт, B - требует
+            {
+                case "1":
+                    EventButt1.Text += "" + TradeTrack.Value * R + " рабов в обмен на ";
+                    break;
+                case "2":
+                    EventButt1.Text += "" + TradeTrack.Value * R + " ед. пищи в обмен на ";
+                    break;
+                case "3":
+                    EventButt1.Text += "" + TradeTrack.Value * R + " ед. лекарств в обмен на ";
+                    break;
+                case "4":
+                    EventButt1.Text += "" + TradeTrack.Value * R + " ед. примитив. ресурсов в обмен на ";
+                    break;
+                case "5":
+                    EventButt1.Text += "" + TradeTrack.Value * R + " ед. металла в обмен на ";
+                    break;
+                case "6":
+                    EventButt1.Text += "" + TradeTrack.Value * R + " ед. оружия в обмен на ";
+                    break;
+                case "7":
+                    R = 1;
+                    EventButt1.Text += "" + TradeTrack.Value * R + " алмазов в обмен на ";
+                    break;
+            }
+            switch (Convert.ToString(B)) //1 - люди, 2 - еда, 3 хилки, 4 - обыч. ресы, 5 - металл, 6 - оружие, 7 - алмазы. T - продаёт, B - требует
+            {
+                case "1":
+                    P = 1;
+                    EventButt1.Text += "" + (TradeTrack.Value * P) + " рабов";
+                    break;
+                case "2":
+                    EventButt1.Text += "" + (TradeTrack.Value * P) + " ед. пищи";
+                    break;
+                case "3":
+                    EventButt1.Text += "" + (TradeTrack.Value * P) + " ед. лекарств";
+                    break;
+                case "4":
+                    EventButt1.Text += "" + (TradeTrack.Value * P) + " ед. примитив. ресурсов";
+                    break;
+                case "5":
+                    EventButt1.Text += "" + (TradeTrack.Value * P) + " ед. металла";
+                    break;
+                case "6":
+                    EventButt1.Text += "" + (TradeTrack.Value * P) + " ед. оружия";
+                    break;
+                case "7":
+                    EventButt1.Text += "" + (TradeTrack.Value * P) + " ед. алмазов";
+                    break;
+            }
+        }
+
+        private void ButtStat_Click(object sender, EventArgs e)
+        {
+            LaberRepTribe.Text = "Репутация с племенами: " + RepTribe + " из 1000";
+            LaberRepCas.Text = "Репутация с замком: " + RepCastle + " из 1000";
+            LaberRepCity.Text = "Репутация с городом: " + RepCity + " из 1000";
+            switch (Convert.ToString(DevLVL))
+            {
+                case "0":
+                    LaberDev.Text = "Уровень развития: Племя";
+                    System.Console.WriteLine("Я нашёв");
+                    break;
+                case "1":
+                    LaberDev.Text = "Уровень развития: Средние века";
+                    break;
+                case "2":
+                    LaberDev.Text = "Уровень развития: Индустриальный";
+                    break;
+                case "3":
+                    LaberDev.Text = "Уровень развития: Пост-индустриальный";
+                    break;
+            }
+            for (int i = 0; i < 20; i++)
+            {
+                if (HaveAch[i] == true)
+                {
+                    list_labels[i].ForeColor = Color.Green;
+                    list_labels[i].Text = AchText[i];
+                }
+                else
+                {
+                    list_labels[i].ForeColor = Color.Red;
+                    list_labels[i].Text = "НЕ ПОЛУЧЕНО";
+                }
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                if (HaveStat[i] == true)
+                {
+                    list_labels2[i].Text = StatText[i];
+                }
+                else
+                {
+                    list_labels2[i].Text = "";
+                }
+            }
+            PanelStatus.Visible = true;
+            ButtStat.Visible = false;
+            PanelStatus.Location = new Point(10, 10);
+        }
+
+        private void CloseStatus_Click(object sender, EventArgs e)
+        {
+            PanelStatus.Visible = false;
+            ButtStat.Visible = true;
+        }
+
+        private void label1_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[0] == true)
+            {
+                StatusDesc.Text = AchDesc[0];
+            }
+        }
+        private void label2_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[1] == true)
+            {
+                StatusDesc.Text = AchDesc[1];
+            }
+        }
+        private void label3_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[2] == true)
+            {
+                StatusDesc.Text = AchDesc[2];
+            }
+        }
+        private void label4_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[3] == true)
+            {
+                StatusDesc.Text = AchDesc[3];
+            }
+        }
+        private void label5_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[4] == true)
+            {
+                StatusDesc.Text = AchDesc[4];
+            }
+        }
+        private void label6_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[5] == true)
+            {
+                StatusDesc.Text = AchDesc[5];
+            }
+        }
+        private void label7_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[6] == true)
+            {
+                StatusDesc.Text = AchDesc[6];
+            }
+        }
+        private void label8_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[7] == true)
+            {
+                StatusDesc.Text = AchDesc[7];
+            }
+        }
+        private void label9_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[8] == true)
+            {
+                StatusDesc.Text = AchDesc[8];
+            }
+        }
+        private void label10_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[9] == true)
+            {
+                StatusDesc.Text = AchDesc[9];
+            }
+        }
+        private void label11_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[10] == true)
+            {
+                StatusDesc.Text = AchDesc[10];
+            }
+        }
+        private void label12_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[11] == true)
+            {
+                StatusDesc.Text = AchDesc[11];
+            }
+        }
+        private void label13_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[12] == true)
+            {
+                StatusDesc.Text = AchDesc[12];
+            }
+        }
+        private void label14_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[13] == true)
+            {
+                StatusDesc.Text = AchDesc[13];
+            }
+        }
+        private void label15_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[14] == true)
+            {
+                StatusDesc.Text = AchDesc[14];
+            }
+        }
+        private void label16_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[15] == true)
+            {
+                StatusDesc.Text = AchDesc[15];
+            }
+        }
+        private void label17_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[16] == true)
+            {
+                StatusDesc.Text = AchDesc[16];
+            }
+        }
+        private void label18_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[17] == true)
+            {
+                StatusDesc.Text = AchDesc[17];
+            }
+        }
+        private void label19_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[18] == true)
+            {
+                StatusDesc.Text = AchDesc[18];
+            }
+        }
+        private void label20_MouseEnter(object sender, EventArgs e)
+        {
+            if (HaveAch[19] == true)
+            {
+                StatusDesc.Text = AchDesc[19];
+            }
+        }
+
+        private void PanelStatus_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "";
+        }
+
+        private void TitleStatus_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Наведи на полученное достижение и тут высветится его описание";
+        }
+
+        private void TitleStatus2_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Ниже отображаются более подробные характеристики состояния племени и некоторые бонусы. Наведите на них, что бы узнать подробности.";
+        }
+
+        private void LaberRepTribe_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Отображает, как к вам относятся в соседнем племени:\nот 0 до 250 - Враждебно. Могут напасть, не идут на диалог\nот 250 до 750 - Нейтрально. Ведут торговлю и могут поговорить, но ничем вам не обязаны\nот 750 до 1000 - Дружелюбно. Ваше племя тут любят и готовы помочь вам.";
+        }
+
+        private void LaberRepCas_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Отображает, как к вам относятся в соседнем средневековом замке:\nот 0 до 250 - Враждебно. Могут напасть, не идут на диалог\nот 250 до 750 - Нейтрально. Ведут торговлю и могут поговорить, но ничем вам не обязаны\nот 750 до 1000 - Дружелюбно. Ваше племя тут любят и готовы помочь вам.";
+        }
+
+        private void LaberRepCity_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Отображает, как к вам относятся в соседнем современном городе:\nот 0 до 250 - Враждебно. Могут напасть, не идут на диалог\nот 250 до 750 - Нейтрально. Ведут торговлю и могут поговорить, но ничем вам не обязаны\nот 750 до 1000 - Дружелюбно. Ваше племя тут любят и готовы помочь вам.";
+        }
+
+        private void LaberDev_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Показывает, на какой стадии вы находитесь по уровню развития. 95% времени это будет племя, потому что прочитай название игры.";
+        }
+
+        private void PanelBattle_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "";
+        }
+
+        private void Tactic1_Click(object sender, EventArgs e)
+        {
+            IDT = 0;
+            Fight();
+        }
+        private void Tactic2_Click(object sender, EventArgs e)
+        {
+            if (rWeapon >= 1)
+            {
+                rWeapon -= 1;
+                IDT = 1;
+                Fight();
+            }
+        }
+        private void Tactic3_Click(object sender, EventArgs e)
+        {
+            if (rWeapon >= 1)
+            {
+                rWeapon -= 1;
+                IDT = 2;
+                Fight();
+            }
+        }
+        private void Tactic4_Click(object sender, EventArgs e)
+        {
+            if (rWeapon >= 1)
+            {
+                rWeapon -= 1;
+                IDT = 3;
+                Fight();
+            }
+        }
+        private void Tactic5_Click(object sender, EventArgs e)
+        {
+            if (rWood >= 1)
+            {
+                rWood -= 1;
+                IDT = 4;
+                Fight();
+            }
+        }
+        private void Tactic6_Click(object sender, EventArgs e)
+        {
+            if (rWeapon >= 2)
+            {
+                rWeapon-= 2;
+                IDT = 5;
+                Fight();
+            }
+        }
+        private void Tactic7_Click(object sender, EventArgs e)
+        {
+            if (rWeapon >= 1)
+            {
+                rWeapon -= 1;
+                IDT = 6;
+                Fight();
+            }
+        }
+        private void Tactic8_Click(object sender, EventArgs e)
+        {
+            IDT = 7;
+            Fight();
+        }
+        private void Tactic9_Click(object sender, EventArgs e)
+        {
+
+        }
+        private void Tactic10_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Tactic1_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Прямая лобовая атака голыми руками. Очень отчаянная и самоубийственная, но не требует оружия и доступна всегда";
+        }
+        private void Tactic2_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Прямая лобовая атака, но уже с нормальным вооружением, а не камнями и кулаками\nНЕОБХОДИМО 1 ЕД. ОРУЖИЯ";
+        }
+        private void Tactic3_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Мы оргазиуем им засаду и выждем, пока они сами придут к нам в западню\nНЕОБХОДИМО 1 ЕД. ОРУЖИЯ";
+        }
+        private void Tactic4_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Обстреляем позиции неприятеля издалека нашими стрелами\nНЕОБХОДИМО 1 ЕД. ОРУЖИЯ";
+        }
+        private void Tactic5_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Построим наспех баррикады для отражения следующей атаки\nНЕОБХОДИМО 1 ЕД. РЕСУРСОВ";
+        }
+        private void Tactic6_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Максимально хорошо вооружить наших людей и отправить ''тяжёлую пехоту'' в бой\nНЕОБХОДИМО 2 ЕД. ОРУЖИЯ";
+        }
+        private void Tactic7_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Начнём более организованную атаку и медленную атаку на позиции врага\nНЕОБХОДИМО 1 ЕД. ОРУЖИЯ";
+        }
+        private void Tactic8_MouseEnter(object sender, EventArgs e)
+        {
+            BattleTacText.Text = "Рассыпаться по одиночке, что позволит избежать обстрел или единую мощную атаку";
+        }
+        private void Tactic9_MouseEnter(object sender, EventArgs e)
+        {
+
+        }
+        private void Tactic10_MouseEnter(object sender, EventArgs e)
+        {
+
+        }
+
+        private void ButtBattleWon_Click(object sender, EventArgs e)
+        {
+            PanelBattle.Visible = false;
+            ButtStat.Visible = true;
+            EventAlgoritm();
+            EventLoad();
+        }
+
+        private void Status1_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Вы основательно подготовились и теперь вы не будете голодать, если что то случится с едой...\n+10 ед. еды, если наступает голод";
+        }
+
+        private void Status2_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Ваши войска хорошо натренерованы и что то мыслят в тактике.\nИнициатива +1 ед. в любой битве, пока есть этот эффект.";
+        }
+
+        private void Status3_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Наши люди выглядят бледными и очень истощёнными. По деревне гуляет зараза\nКаждый день тратится 1 ед. лекарства, если его нет - умирает 1 человек. 10% шанс, что болезнь уйдёт сама каждый день.";
+        }
+
+        private void Status4_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "Мы можем позволить держать себе немного животных, которые могут постоянно кормить несколько человек\n+1 ед. еды каждый день";
+        }
+
+        private void Status5_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "В воздухе постоянно висит напряжение. Население становится более недовольным каждый день\n-2 ед. морали каждый день";
+        }
+
+        private void Status6_MouseEnter(object sender, EventArgs e)
+        {
+            StatusDesc.Text = "В нашем поселении есть стены, это обеспечивает нам дополнительную защиту\n-1 урон врага в битве на местности ''Деревня''";
+
+        }
+
+        private void Music_Tick(object sender, EventArgs e)
+        {
+            string Path = System.AppDomain.CurrentDomain.BaseDirectory;
+            System.Console.WriteLine(Path + @"\SweetTribeMusic.mp3");
+            Music.Interval = 210000;
+            PlayFile(Path + @"\SweetTribeMusic.mp3");
+        }
+
+        private void PlayFile(String url)
+        {
+            Player = new WMPLib.WindowsMediaPlayer();
+            Player.URL = url;
+            Player.controls.play();
+        }
+    }
+}
